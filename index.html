@@ -8,41 +8,74 @@
 </head>
 <body>
 
-  <header>muscle-log</header>
+  <!-- ── Auth Screen ── -->
+  <div id="auth-screen">
+    <div class="auth-card">
+      <div class="auth-logo">muscle-log</div>
 
-  <nav>
-    <button class="active" data-tab="log">Log</button>
-    <button data-tab="charts">Charts</button>
-    <button data-tab="data">Data</button>
-  </nav>
-
-  <main>
-    <div id="page-log" class="page active">
-      <div class="card">
-        <h2>Today's Training</h2>
-        <p class="placeholder">No exercises yet.<br>Tap "+ Add Exercise" to start.</p>
+      <div class="auth-mode-tabs">
+        <button class="auth-mode-tab active" data-mode="signin">Sign In</button>
+        <button class="auth-mode-tab" data-mode="signup">Sign Up</button>
       </div>
+
+      <form id="auth-form" novalidate>
+        <div class="form-group">
+          <label for="auth-email">Email</label>
+          <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email" />
+        </div>
+        <div class="form-group">
+          <label for="auth-password">Password</label>
+          <input type="password" id="auth-password" placeholder="••••••••" autocomplete="current-password" />
+        </div>
+        <p id="auth-error" class="auth-error hidden"></p>
+        <button type="submit" class="btn btn-primary" id="auth-submit">Sign In</button>
+      </form>
+
     </div>
+  </div>
 
-    <div id="page-charts" class="page">
-      <div class="card">
-        <h2>Body Weight</h2>
-        <p class="placeholder">No data yet.</p>
-      </div>
-      <div class="card">
-        <h2>Exercise Progress</h2>
-        <p class="placeholder">No data yet.</p>
-      </div>
-    </div>
+  <!-- ── Main App ── -->
+  <div id="app" class="hidden">
+    <header>
+      <span>muscle-log</span>
+      <button class="btn-signout" id="btn-signout">Sign Out</button>
+    </header>
 
-    <div id="page-data" class="page">
-      <div class="card">
-        <h2>Data Management</h2>
-        <p class="placeholder">Export / Import coming soon.</p>
-      </div>
-    </div>
-  </main>
+    <nav>
+      <button class="active" data-tab="log">Log</button>
+      <button data-tab="charts">Charts</button>
+      <button data-tab="data">Data</button>
+    </nav>
 
+    <main>
+      <div id="page-log" class="page active">
+        <div class="card">
+          <h2>Today's Training</h2>
+          <p class="placeholder">No exercises yet.<br>Tap "+ Add Exercise" to start.</p>
+        </div>
+      </div>
+
+      <div id="page-charts" class="page">
+        <div class="card">
+          <h2>Body Weight</h2>
+          <p class="placeholder">No data yet.</p>
+        </div>
+        <div class="card">
+          <h2>Exercise Progress</h2>
+          <p class="placeholder">No data yet.</p>
+        </div>
+      </div>
+
+      <div id="page-data" class="page">
+        <div class="card">
+          <h2>Data Management</h2>
+          <p class="placeholder">Export / Import coming soon.</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="app.js"></script>
 
 </body>
