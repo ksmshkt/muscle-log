@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>muscle-log</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header>muscle-log</header>
+
+  <nav>
+    <button class="active" data-tab="log">Log</button>
+    <button data-tab="charts">Charts</button>
+    <button data-tab="data">Data</button>
+  </nav>
+
+  <main>
+    <div id="page-log" class="page active">
+      <div class="card">
+        <h2>Today's Training</h2>
+        <p class="placeholder">No exercises yet.<br>Tap "+ Add Exercise" to start.</p>
+      </div>
+    </div>
+
+    <div id="page-charts" class="page">
+      <div class="card">
+        <h2>Body Weight</h2>
+        <p class="placeholder">No data yet.</p>
+      </div>
+      <div class="card">
+        <h2>Exercise Progress</h2>
+        <p class="placeholder">No data yet.</p>
+      </div>
+    </div>
+
+    <div id="page-data" class="page">
+      <div class="card">
+        <h2>Data Management</h2>
+        <p class="placeholder">Export / Import coming soon.</p>
+      </div>
+    </div>
+  </main>
+
+  <script src="app.js"></script>
+
+</body>
+</html>
