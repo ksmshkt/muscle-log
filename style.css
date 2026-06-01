@@ -109,7 +109,7 @@ body {
 .btn {
   width: 100%;
   padding: 11px;
-  border: none;
+  border: 1.5px solid transparent;
   border-radius: 8px;
   font-size: 15px;
   font-weight: 600;
@@ -257,22 +257,29 @@ main {
   font-size: 15px;
 }
 
-/* ── Log date row ── */
-.log-date-row {
+/* ── Log top row (date + body weight) ── */
+.log-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  gap: 12px;
+}
+
+.log-date-section {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 14px;
 }
 
-.log-date-row label {
+.log-date-section label {
   font-size: 13px;
   font-weight: 600;
   color: var(--text-sub);
   white-space: nowrap;
 }
 
-.log-date-row input[type="date"] {
+.log-date-section input[type="date"] {
   padding: 7px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -283,15 +290,59 @@ main {
   transition: border-color 0.2s;
 }
 
-.log-date-row input[type="date"]:focus {
+.log-date-section input[type="date"]:focus {
   border-color: var(--primary);
 }
 
-/* ── Log toolbar ── */
-.log-toolbar {
+.log-bw-section {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 6px;
+}
+
+.log-bw-section input[type="number"] {
+  width: 72px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 15px;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.log-bw-section input[type="number"]:focus {
+  border-color: var(--primary);
+}
+
+.log-bw-section label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-sub);
+  white-space: nowrap;
+}
+
+.log-bw-section span {
+  font-size: 14px;
+  color: var(--text-sub);
+}
+
+.btn-save-bw {
+  padding: 7px 12px;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.btn-save-bw:hover { background: var(--primary-d); }
+
+/* ── Log toolbar ── */
+.log-toolbar {
   margin-bottom: 16px;
 }
 
@@ -396,42 +447,30 @@ main {
 
 .btn-add-set:hover { background: var(--primary-d); }
 
-/* ── Body weight card ── */
-.body-weight-card { margin-bottom: 12px; }
-
-.body-weight-input-row {
+/* ── Log action row (Save Exercise) ── */
+.log-action-row {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  justify-content: center;
+  margin-top: 8px;
 }
 
-.body-weight-input-row input {
-  width: 100px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 18px;
-  text-align: center;
-  outline: none;
-  transition: border-color 0.2s;
+.log-action-row .btn { margin-top: 0; }
+
+/* ── Outline button ── */
+.btn-outline {
+  background: none;
+  border: 1.5px solid var(--primary);
+  color: var(--primary);
 }
 
-.body-weight-input-row input:focus { border-color: var(--primary); }
-
-.body-weight-input-row span {
-  font-size: 15px;
-  color: var(--text-sub);
+.btn-outline:hover:not(:disabled) {
+  background: rgba(37, 99, 235, 0.06);
 }
-
-/* ── Save Session button ── */
-#btn-save-session { margin-top: 8px; }
 
 /* ── Add Exercise button ── */
 .btn-add-exercise {
-  flex: 1;
-  margin-left: 12px;
+  width: 100%;
   padding: 12px;
-  margin-bottom: 0;
   border: 1.5px dashed var(--border);
   border-radius: var(--radius);
   background: none;
@@ -521,15 +560,18 @@ main {
 }
 
 .modal-header {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   margin-bottom: 16px;
   font-size: 16px;
   font-weight: 600;
 }
 
 .modal-close {
+  position: absolute;
+  right: 0;
   background: none;
   border: none;
   font-size: 18px;
@@ -542,6 +584,7 @@ main {
 /* ── Category tabs ── */
 .category-tabs {
   display: flex;
+  justify-content: center;
   gap: 8px;
   overflow-x: auto;
   padding-bottom: 14px;
@@ -582,6 +625,7 @@ main {
   cursor: pointer;
   transition: background 0.1s;
   border-radius: 4px;
+  text-align: center;
 }
 
 .exercise-list li:last-child { border-bottom: none; }
@@ -644,12 +688,9 @@ main {
     padding: 10px 20px;
   }
 
-  /* Save Session: 30% centered */
-  #btn-save-session {
-    display: block;
+  /* Save Exercise: 30% centered */
+  #btn-save-exercise {
     width: 30%;
-    margin-left: auto;
-    margin-right: auto;
   }
 
   /* Modal: centered dialog */
