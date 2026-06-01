@@ -49,10 +49,8 @@
 
     <main>
       <div id="page-log" class="page active">
-        <div class="card">
-          <h2>Today's Training</h2>
-          <p class="placeholder">No exercises yet.<br>Tap "+ Add Exercise" to start.</p>
-        </div>
+        <button class="btn-add-exercise" id="btn-add-exercise">+ Add Exercise</button>
+        <div id="exercise-blocks"></div>
       </div>
 
       <div id="page-charts" class="page">
@@ -73,6 +71,24 @@
         </div>
       </div>
     </main>
+
+    <!-- ── Exercise picker modal ── -->
+    <div id="modal-exercise" class="modal hidden">
+      <div class="modal-overlay" id="modal-overlay"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <span>Select Exercise</span>
+          <button class="modal-close" id="modal-close">✕</button>
+        </div>
+        <div class="category-tabs" id="category-tabs"></div>
+        <ul class="exercise-list" id="exercise-list"></ul>
+        <div class="custom-exercise-form">
+          <input type="text" id="custom-exercise-input" placeholder="Custom exercise name" />
+          <button class="btn btn-primary" id="btn-save-custom">Add</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>

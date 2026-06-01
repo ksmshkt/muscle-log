@@ -22,11 +22,14 @@ let authMode = 'signin';
 function showAuth() {
   authScreen.classList.remove('hidden');
   app.classList.add('hidden');
+  sessionExercises = [];
 }
 
 function showApp() {
   authScreen.classList.add('hidden');
   app.classList.remove('hidden');
+  loadCustomExercises();
+  renderExerciseBlocks();
 }
 
 function setError(msg) {
@@ -88,4 +91,143 @@ authForm.addEventListener('submit', async e => {
 // ── Sign out ──
 btnSignout.addEventListener('click', async () => {
   await sb.auth.signOut();
+});
+
+const PRESETS = {
+  Chest:     ['Bench Press', 'Dumbbell Fly', 'Pec Deck'],
+  Back:      ['Deadlift', 'Lat Pulldown', 'Bent Over Row'],
+  Legs:      ['Squat', 'Leg Press', 'Leg Curl'],
+  Shoulders: ['Shoulder Press', 'Lateral Raise'],
+  Arms:      ['Barbell Curl', 'Triceps Pressdown'],
+  Cardio:    ['Running', 'Bike'],
+};
+const CATEGORIES = Object.keys(PRESETS);
+
+let customExercises = [];
+let sessionExercises = [];
+let activeCategory = CATEGORIES[0];
+
+// ── DOM refs (exercise) ──
+const modalExercise   = document.getElementById('modal-exercise');
+const modalOverlay    = document.getElementById('modal-overlay');
+const modalCloseBtn   = document.getElementById('modal-close');
+const categoryTabsEl  = document.getElementById('category-tabs');
+const exerciseListEl  = document.getElementById('exercise-list');
+const customInput     = document.getElementById('custom-exercise-input');
+const btnSaveCustom   = document.getElementById('btn-save-custom');
+const btnAddExercise  = document.getElementById('btn-add-exercise');
+const exerciseBlocksEl = document.getElementById('exercise-blocks');
+
+// ── Load custom exercises from Supabase ──
+async function loadCustomExercises() {
+  const { data, error } = await sb
+    .from('exercises')
+    .select('id, name, category')
+    .eq('is_preset', false)
+    .order('name');
+  if (!error && data) customExercises = data;
+}
+
+// ── Modal ──
+function openModal() {
+  activeCategory = CATEGORIES[0];
+  renderCategoryTabs();
+  renderExerciseList();
+  modalExercise.classList.remove('hidden');
+}
+
+function closeModal() {
+  modalExercise.classList.add('hidden');
+  customInput.value = '';
+}
+
+btnAddExercise.addEventListener('click', openModal);
+modalCloseBtn.addEventListener('click', closeModal);
+modalOverlay.addEventListener('click', closeModal);
+
+// ── Category tabs ──
+function renderCategoryTabs() {
+  categoryTabsEl.innerHTML = CATEGORIES.map(cat => `
+    <button class="category-tab${cat === activeCategory ? ' active' : ''}" data-cat="${cat}">${cat}</button>
+  `).join('');
+
+  categoryTabsEl.querySelectorAll('.category-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeCategory = btn.dataset.cat;
+      renderCategoryTabs();
+      renderExerciseList();
+    });
+  });
+}
+
+// ── Exercise list ──
+function renderExerciseList() {
+  const presets = (PRESETS[activeCategory] || []).map(name => ({ name, category: activeCategory }));
+  const customs = customExercises.filter(e => e.category === activeCategory);
+  const all = [...presets, ...customs];
+
+  exerciseListEl.innerHTML = all.length
+    ? all.map(ex => `<li data-name="${ex.name}" data-cat="${ex.category}">${ex.name}</li>`).join('')
+    : '<li style="color:var(--text-sub);cursor:default">No exercises</li>';
+
+  exerciseListEl.querySelectorAll('li[data-name]').forEach(li => {
+    li.addEventListener('click', () => {
+      addExercise(li.dataset.name, li.dataset.cat);
+      closeModal();
+    });
+  });
+}
+
+// ── Exercise blocks ──
+function addExercise(name, category) {
+  sessionExercises.push({ name, category, sets: [] });
+  renderExerciseBlocks();
+}
+
+function removeExercise(index) {
+  sessionExercises.splice(index, 1);
+  renderExerciseBlocks();
+}
+
+function renderExerciseBlocks() {
+  if (!sessionExercises.length) {
+    exerciseBlocksEl.innerHTML = '<p class="placeholder">No exercises yet.<br>Tap "+ Add Exercise" to start.</p>';
+    return;
+  }
+  exerciseBlocksEl.innerHTML = sessionExercises.map((ex, i) => `
+    <div class="exercise-block">
+      <div class="exercise-block-header">
+        <div>
+          <div class="exercise-name">${ex.name}</div>
+          <div class="exercise-category">${ex.category}</div>
+        </div>
+        <button class="btn-remove-exercise" data-i="${i}">✕</button>
+      </div>
+    </div>
+  `).join('');
+
+  exerciseBlocksEl.querySelectorAll('.btn-remove-exercise').forEach(btn => {
+    btn.addEventListener('click', () => removeExercise(+btn.dataset.i));
+  });
+}
+
+// ── Save custom exercise ──
+btnSaveCustom.addEventListener('click', async () => {
+  const name = customInput.value.trim();
+  if (!name) return;
+
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+
+  const { data, error } = await sb
+    .from('exercises')
+    .insert({ user_id: user.id, name, category: activeCategory, is_preset: false })
+    .select()
+    .single();
+
+  if (!error && data) {
+    customExercises.push(data);
+    customInput.value = '';
+    renderExerciseList();
+  }
 });
