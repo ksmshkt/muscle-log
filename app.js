@@ -106,6 +106,7 @@ const CATEGORIES = Object.keys(PRESETS);
 let customExercises = [];
 let sessionExercises = [];
 let activeCategory = CATEGORIES[0];
+let currentUnit = localStorage.getItem('unit') || 'kg';
 
 // ── DOM refs (exercise) ──
 const modalExercise   = document.getElementById('modal-exercise');
@@ -162,25 +163,25 @@ function renderCategoryTabs() {
 
 // ── Exercise list ──
 function renderExerciseList() {
-  const presets = (PRESETS[activeCategory] || []).map(name => ({ name, category: activeCategory }));
+  const presets = (PRESETS[activeCategory] || []).map(name => ({ name, category: activeCategory, id: null }));
   const customs = customExercises.filter(e => e.category === activeCategory);
   const all = [...presets, ...customs];
 
   exerciseListEl.innerHTML = all.length
-    ? all.map(ex => `<li data-name="${ex.name}" data-cat="${ex.category}">${ex.name}</li>`).join('')
+    ? all.map(ex => `<li data-name="${ex.name}" data-cat="${ex.category}"${ex.id ? ` data-id="${ex.id}"` : ''}>${ex.name}</li>`).join('')
     : '<li style="color:var(--text-sub);cursor:default">No exercises</li>';
 
   exerciseListEl.querySelectorAll('li[data-name]').forEach(li => {
     li.addEventListener('click', () => {
-      addExercise(li.dataset.name, li.dataset.cat);
+      addExercise(li.dataset.name, li.dataset.cat, li.dataset.id || null);
       closeModal();
     });
   });
 }
 
 // ── Exercise blocks ──
-function addExercise(name, category) {
-  sessionExercises.push({ name, category, sets: [] });
+function addExercise(name, category, id = null) {
+  sessionExercises.push({ name, category, id, sets: [] });
   renderExerciseBlocks();
 }
 
@@ -189,11 +190,22 @@ function removeExercise(index) {
   renderExerciseBlocks();
 }
 
+function addSet(ei, weight, reps) {
+  sessionExercises[ei].sets.push({ weight, reps });
+  renderExerciseBlocks();
+}
+
+function removeSet(ei, si) {
+  sessionExercises[ei].sets.splice(si, 1);
+  renderExerciseBlocks();
+}
+
 function renderExerciseBlocks() {
   if (!sessionExercises.length) {
     exerciseBlocksEl.innerHTML = '<p class="placeholder">No exercises yet.<br>Tap "+ Add Exercise" to start.</p>';
     return;
   }
+
   exerciseBlocksEl.innerHTML = sessionExercises.map((ex, i) => `
     <div class="exercise-block">
       <div class="exercise-block-header">
@@ -203,12 +215,154 @@ function renderExerciseBlocks() {
         </div>
         <button class="btn-remove-exercise" data-i="${i}">✕</button>
       </div>
+      <div class="set-list">
+        ${ex.sets.map((s, j) => `
+          <div class="set-row">
+            <span class="set-number">Set ${j + 1}</span>
+            <span class="set-detail">${s.weight} ${currentUnit} × ${s.reps} reps</span>
+            <button class="btn-copy-set" data-ei="${i}" data-si="${j}" title="Copy">⎘</button>
+            <button class="btn-delete-set" data-ei="${i}" data-si="${j}">✕</button>
+          </div>
+        `).join('')}
+      </div>
+      <div class="set-input-row">
+        <input type="number" class="input-weight" data-ei="${i}" placeholder="0" min="0" step="0.5" />
+        <span>${currentUnit}</span>
+        <span class="set-sep">×</span>
+        <input type="number" class="input-reps" data-ei="${i}" placeholder="0" min="1" step="1" />
+        <span>reps</span>
+        <button class="btn-add-set" data-ei="${i}">+ Add Set</button>
+      </div>
     </div>
   `).join('');
 
   exerciseBlocksEl.querySelectorAll('.btn-remove-exercise').forEach(btn => {
     btn.addEventListener('click', () => removeExercise(+btn.dataset.i));
   });
+
+  exerciseBlocksEl.querySelectorAll('.btn-add-set').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const ei = +btn.dataset.ei;
+      const weight = parseFloat(exerciseBlocksEl.querySelector(`.input-weight[data-ei="${ei}"]`).value);
+      const reps   = parseInt(exerciseBlocksEl.querySelector(`.input-reps[data-ei="${ei}"]`).value);
+      if (!weight || !reps) return;
+      addSet(ei, weight, reps);
+    });
+  });
+
+  exerciseBlocksEl.querySelectorAll('.input-reps').forEach(input => {
+    input.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      const ei     = +input.dataset.ei;
+      const weight = parseFloat(exerciseBlocksEl.querySelector(`.input-weight[data-ei="${ei}"]`).value);
+      const reps   = parseInt(input.value);
+      if (weight && reps) addSet(ei, weight, reps);
+    });
+  });
+
+  exerciseBlocksEl.querySelectorAll('.btn-copy-set').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const { weight, reps } = sessionExercises[+btn.dataset.ei].sets[+btn.dataset.si];
+      addSet(+btn.dataset.ei, weight, reps);
+    });
+  });
+
+  exerciseBlocksEl.querySelectorAll('.btn-delete-set').forEach(btn => {
+    btn.addEventListener('click', () => removeSet(+btn.dataset.ei, +btn.dataset.si));
+  });
+}
+
+// ════════════════════════════════════════
+// STEP 5: Training recording
+// ════════════════════════════════════════
+
+// ── Unit toggle ──
+function applyUnit() {
+  document.querySelectorAll('.unit-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.unit === currentUnit);
+  });
+}
+
+document.querySelectorAll('.unit-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentUnit = btn.dataset.unit;
+    localStorage.setItem('unit', currentUnit);
+    applyUnit();
+    if (sessionExercises.length) renderExerciseBlocks();
+  });
+});
+
+// Apply saved unit on load
+applyUnit();
+
+// ── Save session ──
+document.getElementById('btn-save-session').addEventListener('click', saveSession);
+
+async function saveSession() {
+  const exercises = sessionExercises.filter(ex => ex.sets.length > 0);
+  if (!exercises.length) return;
+
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+
+  const btn = document.getElementById('btn-save-session');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  const today = new Date().toISOString().split('T')[0];
+  const { data: session, error: sessionError } = await sb
+    .from('sessions')
+    .insert({ user_id: user.id, date: today })
+    .select()
+    .single();
+
+  if (sessionError) {
+    btn.disabled = false;
+    btn.textContent = 'Save Session';
+    return;
+  }
+
+  for (const ex of exercises) {
+    let exerciseId = ex.id;
+
+    if (!exerciseId) {
+      const { data: existing } = await sb
+        .from('exercises')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('name', ex.name)
+        .maybeSingle();
+
+      if (existing) {
+        exerciseId = existing.id;
+      } else {
+        const { data: created } = await sb
+          .from('exercises')
+          .insert({ user_id: user.id, name: ex.name, category: ex.category, is_preset: true })
+          .select()
+          .single();
+        exerciseId = created?.id;
+      }
+    }
+
+    if (!exerciseId) continue;
+
+    await sb.from('sets').insert(
+      ex.sets.map((s, order) => ({
+        session_id: session.id,
+        exercise_id: exerciseId,
+        weight: s.weight,
+        reps: s.reps,
+        unit: currentUnit,
+        order,
+      }))
+    );
+  }
+
+  sessionExercises = [];
+  renderExerciseBlocks();
+  btn.disabled = false;
+  btn.textContent = 'Save Session';
 }
 
 // ── Save custom exercise ──

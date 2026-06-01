@@ -49,8 +49,15 @@
 
     <main>
       <div id="page-log" class="page active">
-        <button class="btn-add-exercise" id="btn-add-exercise">+ Add Exercise</button>
+        <div class="log-toolbar">
+          <div class="unit-toggle">
+            <button class="unit-btn active" data-unit="kg">kg</button>
+            <button class="unit-btn" data-unit="lbs">lbs</button>
+          </div>
+          <button class="btn-add-exercise" id="btn-add-exercise">+ Add Exercise</button>
+        </div>
         <div id="exercise-blocks"></div>
+        <button class="btn btn-primary" id="btn-save-session">Save Session</button>
       </div>
 
       <div id="page-charts" class="page">

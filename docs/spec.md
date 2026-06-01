@@ -159,7 +159,7 @@ body_weights
 | Step 2 | Supabase接続 | [x] |
 | Step 3 | 認証 | [x] |
 | Step 4 | 種目マスタ | [x] |
-| Step 5 | トレーニング記録 | [ ] |
+| Step 5 | トレーニング記録 | [x] |
 | Step 6 | 体重記録 | [ ] |
 | Step 7 | 履歴表示 | [ ] |
 | Step 8 | グラフ | [ ] |
