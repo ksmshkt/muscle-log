@@ -23,11 +23,18 @@ function showAuth() {
   authScreen.classList.remove('hidden');
   app.classList.add('hidden');
   sessionExercises = [];
+  inputBodyWeight.value = '';
+  logDateInput.value = '';
+}
+
+function today() {
+  return new Date().toISOString().split('T')[0];
 }
 
 function showApp() {
   authScreen.classList.add('hidden');
   app.classList.remove('hidden');
+  logDateInput.value = today();
   loadCustomExercises();
   renderExerciseBlocks();
 }
@@ -116,8 +123,11 @@ const categoryTabsEl  = document.getElementById('category-tabs');
 const exerciseListEl  = document.getElementById('exercise-list');
 const customInput     = document.getElementById('custom-exercise-input');
 const btnSaveCustom   = document.getElementById('btn-save-custom');
-const btnAddExercise  = document.getElementById('btn-add-exercise');
-const exerciseBlocksEl = document.getElementById('exercise-blocks');
+const btnAddExercise    = document.getElementById('btn-add-exercise');
+const exerciseBlocksEl  = document.getElementById('exercise-blocks');
+const inputBodyWeight     = document.getElementById('input-body-weight');
+const bodyWeightUnitLabel = document.getElementById('body-weight-unit-label');
+const logDateInput        = document.getElementById('log-date');
 
 // ── Load custom exercises from Supabase ──
 async function loadCustomExercises() {
@@ -281,6 +291,7 @@ function applyUnit() {
   document.querySelectorAll('.unit-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.unit === currentUnit);
   });
+  bodyWeightUnitLabel.textContent = currentUnit;
 }
 
 document.querySelectorAll('.unit-btn').forEach(btn => {
@@ -300,7 +311,8 @@ document.getElementById('btn-save-session').addEventListener('click', saveSessio
 
 async function saveSession() {
   const exercises = sessionExercises.filter(ex => ex.sets.length > 0);
-  if (!exercises.length) return;
+  const bodyWeightVal = parseFloat(inputBodyWeight.value);
+  if (!exercises.length && !bodyWeightVal) return;
 
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return;
@@ -309,57 +321,70 @@ async function saveSession() {
   btn.disabled = true;
   btn.textContent = 'Saving...';
 
-  const today = new Date().toISOString().split('T')[0];
-  const { data: session, error: sessionError } = await sb
-    .from('sessions')
-    .insert({ user_id: user.id, date: today })
-    .select()
-    .single();
+  const date = logDateInput.value || today();
 
-  if (sessionError) {
-    btn.disabled = false;
-    btn.textContent = 'Save Session';
-    return;
-  }
+  if (exercises.length) {
+    const { data: session, error: sessionError } = await sb
+      .from('sessions')
+      .insert({ user_id: user.id, date: date })
+      .select()
+      .single();
 
-  for (const ex of exercises) {
-    let exerciseId = ex.id;
-
-    if (!exerciseId) {
-      const { data: existing } = await sb
-        .from('exercises')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('name', ex.name)
-        .maybeSingle();
-
-      if (existing) {
-        exerciseId = existing.id;
-      } else {
-        const { data: created } = await sb
-          .from('exercises')
-          .insert({ user_id: user.id, name: ex.name, category: ex.category, is_preset: true })
-          .select()
-          .single();
-        exerciseId = created?.id;
-      }
+    if (sessionError) {
+      btn.disabled = false;
+      btn.textContent = 'Save Session';
+      return;
     }
 
-    if (!exerciseId) continue;
+    for (const ex of exercises) {
+      let exerciseId = ex.id;
 
-    await sb.from('sets').insert(
-      ex.sets.map((s, order) => ({
-        session_id: session.id,
-        exercise_id: exerciseId,
-        weight: s.weight,
-        reps: s.reps,
-        unit: currentUnit,
-        order,
-      }))
-    );
+      if (!exerciseId) {
+        const { data: existing } = await sb
+          .from('exercises')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('name', ex.name)
+          .maybeSingle();
+
+        if (existing) {
+          exerciseId = existing.id;
+        } else {
+          const { data: created } = await sb
+            .from('exercises')
+            .insert({ user_id: user.id, name: ex.name, category: ex.category, is_preset: true })
+            .select()
+            .single();
+          exerciseId = created?.id;
+        }
+      }
+
+      if (!exerciseId) continue;
+
+      await sb.from('sets').insert(
+        ex.sets.map((s, order) => ({
+          session_id: session.id,
+          exercise_id: exerciseId,
+          weight: s.weight,
+          reps: s.reps,
+          unit: currentUnit,
+          order,
+        }))
+      );
+    }
+  }
+
+  if (bodyWeightVal) {
+    await sb.from('body_weights').insert({
+      user_id: user.id,
+      date: date,
+      weight: bodyWeightVal,
+      unit: currentUnit,
+    });
   }
 
   sessionExercises = [];
+  inputBodyWeight.value = '';
   renderExerciseBlocks();
   btn.disabled = false;
   btn.textContent = 'Save Session';

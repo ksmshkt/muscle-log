@@ -257,6 +257,36 @@ main {
   font-size: 15px;
 }
 
+/* ── Log date row ── */
+.log-date-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.log-date-row label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-sub);
+  white-space: nowrap;
+}
+
+.log-date-row input[type="date"] {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--surface);
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.log-date-row input[type="date"]:focus {
+  border-color: var(--primary);
+}
+
 /* ── Log toolbar ── */
 .log-toolbar {
   display: flex;
@@ -365,6 +395,33 @@ main {
 }
 
 .btn-add-set:hover { background: var(--primary-d); }
+
+/* ── Body weight card ── */
+.body-weight-card { margin-bottom: 12px; }
+
+.body-weight-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.body-weight-input-row input {
+  width: 100px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 18px;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.body-weight-input-row input:focus { border-color: var(--primary); }
+
+.body-weight-input-row span {
+  font-size: 15px;
+  color: var(--text-sub);
+}
 
 /* ── Save Session button ── */
 #btn-save-session { margin-top: 8px; }
