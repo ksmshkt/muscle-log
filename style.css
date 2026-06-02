@@ -257,6 +257,55 @@ main {
   font-size: 15px;
 }
 
+/* ── History ── */
+.history-card {
+  margin-bottom: 12px;
+}
+
+.history-date {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-sub);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 10px;
+}
+
+.history-bw {
+  font-size: 13px;
+  color: var(--text-sub);
+  margin-bottom: 10px;
+}
+
+.history-exercise {
+  margin-bottom: 10px;
+}
+
+.history-exercise:last-child {
+  margin-bottom: 0;
+}
+
+.history-exercise-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.history-exercise-cat {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-sub);
+  margin-left: 4px;
+}
+
+.history-set-row {
+  display: flex;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-sub);
+  padding: 3px 0;
+}
+
 /* ── Log top row (date + body weight) ── */
 .log-top-row {
   display: flex;

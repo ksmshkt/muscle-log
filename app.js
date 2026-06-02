@@ -65,6 +65,7 @@ tabs.forEach(btn => {
     pages.forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('page-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'history') loadHistory();
   });
 });
 
@@ -423,3 +424,88 @@ btnSaveCustom.addEventListener('click', async () => {
     renderExerciseList();
   }
 });
+
+// ════════════════════════════════════════
+// History
+// ════════════════════════════════════════
+
+async function loadHistory() {
+  const historyListEl = document.getElementById('history-list');
+  historyListEl.innerHTML = '<p class="placeholder">Loading...</p>';
+
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+
+  const [{ data: sessions }, { data: bodyWeights }] = await Promise.all([
+    sb.from('sessions')
+      .select('id, date, sets(weight, reps, unit, order, exercises(name, category))')
+      .eq('user_id', user.id)
+      .order('date', { ascending: false }),
+    sb.from('body_weights')
+      .select('date, weight, unit')
+      .eq('user_id', user.id)
+      .order('date', { ascending: false }),
+  ]);
+
+  renderHistory(sessions || [], bodyWeights || []);
+}
+
+function renderHistory(sessions, bodyWeights) {
+  const historyListEl = document.getElementById('history-list');
+
+  if (!sessions.length && !bodyWeights.length) {
+    historyListEl.innerHTML = '<p class="placeholder">No history yet.</p>';
+    return;
+  }
+
+  const bwByDate = {};
+  bodyWeights.forEach(bw => { bwByDate[bw.date] = bw; });
+
+  const allDates = [...new Set([
+    ...sessions.map(s => s.date),
+    ...bodyWeights.map(b => b.date),
+  ])].sort((a, b) => b.localeCompare(a));
+
+  const sessionsByDate = {};
+  sessions.forEach(s => {
+    (sessionsByDate[s.date] = sessionsByDate[s.date] || []).push(s);
+  });
+
+  historyListEl.innerHTML = allDates.map(date => {
+    const bw = bwByDate[date];
+
+    const exerciseMap = {};
+    (sessionsByDate[date] || []).forEach(session => {
+      (session.sets || []).forEach(set => {
+        const name = set.exercises?.name || 'Unknown';
+        if (!exerciseMap[name]) exerciseMap[name] = { category: set.exercises?.category || '', sets: [] };
+        exerciseMap[name].sets.push(set);
+      });
+    });
+    Object.values(exerciseMap).forEach(g => g.sets.sort((a, b) => a.order - b.order));
+
+    const bwHTML = bw
+      ? `<div class="history-bw">Body Weight: ${bw.weight} ${bw.unit}</div>`
+      : '';
+
+    const exercisesHTML = Object.entries(exerciseMap).map(([name, group]) => `
+      <div class="history-exercise">
+        <div class="history-exercise-name">${name}<span class="history-exercise-cat">${group.category}</span></div>
+        ${group.sets.map((s, i) => `
+          <div class="history-set-row">
+            <span class="set-number">Set ${i + 1}</span>
+            <span>${s.weight} ${s.unit} × ${s.reps} reps</span>
+          </div>
+        `).join('')}
+      </div>
+    `).join('');
+
+    return `
+      <div class="card history-card">
+        <div class="history-date">${date}</div>
+        ${bwHTML}
+        ${exercisesHTML}
+      </div>
+    `;
+  }).join('');
+}
