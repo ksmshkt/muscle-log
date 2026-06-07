@@ -545,8 +545,8 @@ let allBodyWeights = [];
 let allSessions = [];
 let currentExerciseSets = [];
 
-const CHART_COLOR = '#2563eb';
-const CHART_BG    = 'rgba(37,99,235,0.08)';
+const CHART_COLOR = '#3ea8ff';
+const CHART_BG    = 'rgba(62,168,255,0.08)';
 const chartDefaults = {
   type: 'line',
   options: {
