@@ -70,6 +70,16 @@ tabs.forEach(btn => {
   });
 });
 
+// ── History delete delegation ──
+document.getElementById('history-list').addEventListener('click', e => {
+  const btn = e.target.closest('.btn-delete-history');
+  if (!btn) return;
+  const date = btn.dataset.date;
+  const sessionIds = btn.dataset.sessionIds ? btn.dataset.sessionIds.split(',').filter(Boolean) : [];
+  if (!confirm(`Delete all data for ${date}?`)) return;
+  deleteHistoryByDate(date, sessionIds);
+});
+
 // ── Auth state ──
 sb.auth.onAuthStateChange((_event, session) => {
   session ? showApp() : showAuth();
@@ -498,6 +508,7 @@ function renderHistory(sessions, bodyWeights) {
 
   historyListEl.innerHTML = allDates.map(date => {
     const bw = bwByDate[date];
+    const sessionIds = (sessionsByDate[date] || []).map(s => s.id).join(',');
 
     const exerciseMap = {};
     (sessionsByDate[date] || []).forEach(session => {
@@ -526,12 +537,28 @@ function renderHistory(sessions, bodyWeights) {
 
     return `
       <div class="card history-card">
-        <div class="history-date">${date}</div>
+        <div class="history-date-row">
+          <div class="history-date">${date}</div>
+          <button class="btn-delete-history" data-date="${date}" data-session-ids="${sessionIds}">Delete</button>
+        </div>
         ${bwHTML}
         ${exercisesHTML}
       </div>
     `;
   }).join('');
+}
+
+async function deleteHistoryByDate(date, sessionIds) {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+
+  if (sessionIds.length) {
+    await sb.from('sets').delete().in('session_id', sessionIds);
+    await sb.from('sessions').delete().in('id', sessionIds);
+  }
+  await sb.from('body_weights').delete().eq('user_id', user.id).eq('date', date);
+
+  loadHistory();
 }
 
 // ════════════════════════════════════════

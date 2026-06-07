@@ -326,13 +326,34 @@ main {
   margin-bottom: 12px;
 }
 
+.history-date-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
 .history-date {
   font-size: 13px;
   font-weight: 700;
   color: var(--text-sub);
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  margin-bottom: 10px;
+}
+
+.btn-delete-history {
+  font-size: 12px;
+  padding: 3px 10px;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.btn-delete-history:hover {
+  background: rgba(239, 68, 68, 0.12);
 }
 
 .history-bw {
