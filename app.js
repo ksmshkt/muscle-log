@@ -66,6 +66,7 @@ tabs.forEach(btn => {
     btn.classList.add('active');
     document.getElementById('page-' + btn.dataset.tab).classList.add('active');
     if (btn.dataset.tab === 'history') loadHistory();
+    if (btn.dataset.tab === 'charts')  loadCharts();
   });
 });
 
@@ -362,13 +363,12 @@ async function saveExercise() {
     if (!exerciseId) continue;
 
     await sb.from('sets').insert(
-      ex.sets.map((s, order) => ({
+      ex.sets.map(s => ({
         session_id: session.id,
         exercise_id: exerciseId,
         weight: s.weight,
         reps: s.reps,
         unit: currentUnit,
-        order,
       }))
     );
   }
@@ -438,7 +438,7 @@ async function loadHistory() {
 
   const [{ data: sessions }, { data: bodyWeights }] = await Promise.all([
     sb.from('sessions')
-      .select('id, date, sets(weight, reps, unit, order, exercises(name, category))')
+      .select('id, date')
       .eq('user_id', user.id)
       .order('date', { ascending: false }),
     sb.from('body_weights')
@@ -447,7 +447,32 @@ async function loadHistory() {
       .order('date', { ascending: false }),
   ]);
 
-  renderHistory(sessions || [], bodyWeights || []);
+  if (!sessions?.length && !bodyWeights?.length) {
+    renderHistory([], []);
+    return;
+  }
+
+  const sessionIds = (sessions || []).map(s => s.id);
+  const [{ data: sets }, { data: exercises }] = await Promise.all([
+    sb.from('sets')
+      .select('session_id, exercise_id, weight, reps, unit')
+      .in('session_id', sessionIds)
+      .order('id', { ascending: true }),
+    sb.from('exercises')
+      .select('id, name, category')
+      .eq('user_id', user.id),
+  ]);
+
+  const exMap = Object.fromEntries((exercises || []).map(ex => [ex.id, ex]));
+
+  const sessionsWithSets = (sessions || []).map(s => ({
+    ...s,
+    sets: (sets || [])
+      .filter(set => set.session_id === s.id)
+      .map(set => ({ ...set, exercises: exMap[set.exercise_id] || null })),
+  }));
+
+  renderHistory(sessionsWithSets, bodyWeights || []);
 }
 
 function renderHistory(sessions, bodyWeights) {
@@ -482,7 +507,6 @@ function renderHistory(sessions, bodyWeights) {
         exerciseMap[name].sets.push(set);
       });
     });
-    Object.values(exerciseMap).forEach(g => g.sets.sort((a, b) => a.order - b.order));
 
     const bwHTML = bw
       ? `<div class="history-bw">Body Weight: ${bw.weight} ${bw.unit}</div>`
@@ -509,3 +533,197 @@ function renderHistory(sessions, bodyWeights) {
     `;
   }).join('');
 }
+
+// ════════════════════════════════════════
+// Charts
+// ════════════════════════════════════════
+
+let currentPeriod = 'week';
+let bwChartInstance = null;
+let exChartInstance = null;
+let allBodyWeights = [];
+let allSessions = [];
+let currentExerciseSets = [];
+
+const CHART_COLOR = '#2563eb';
+const CHART_BG    = 'rgba(37,99,235,0.08)';
+const chartDefaults = {
+  type: 'line',
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { display: false }, ticks: { maxTicksLimit: 6, font: { size: 11 } } },
+      y: { ticks: { font: { size: 11 } } },
+    },
+  },
+};
+
+async function loadCharts() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+
+  const [{ data: bwData }, { data: sessionsData }, { data: exercisesData }] = await Promise.all([
+    sb.from('body_weights').select('date, weight, unit').eq('user_id', user.id).order('date', { ascending: true }),
+    sb.from('sessions').select('id, date').eq('user_id', user.id),
+    sb.from('exercises').select('id, name').eq('user_id', user.id).order('name'),
+  ]);
+
+  allBodyWeights = bwData || [];
+  allSessions    = sessionsData || [];
+
+  const select = document.getElementById('exercise-select');
+  const prev   = select.value;
+  select.innerHTML = '<option value="">Select exercise...</option>' +
+    (exercisesData || []).map(ex => `<option value="${ex.id}">${ex.name}</option>`).join('');
+  if (prev) select.value = prev;
+
+  renderBodyWeightChart();
+  renderStats();
+}
+
+function filterByPeriod(data, key) {
+  if (currentPeriod === 'all') return data;
+  const days = currentPeriod === 'week' ? 7 : 30;
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const cutoffStr = cutoff.toISOString().split('T')[0];
+  return data.filter(d => d[key] >= cutoffStr);
+}
+
+function renderBodyWeightChart() {
+  const filtered = filterByPeriod(allBodyWeights, 'date');
+  const wrap      = document.getElementById('bw-chart-wrap');
+  const ph        = document.getElementById('bw-placeholder');
+
+  if (!filtered.length) {
+    wrap.classList.add('hidden');
+    ph.classList.remove('hidden');
+    return;
+  }
+  wrap.classList.remove('hidden');
+  ph.classList.add('hidden');
+
+  const unit = filtered[filtered.length - 1]?.unit || 'kg';
+  if (bwChartInstance) bwChartInstance.destroy();
+  bwChartInstance = new Chart(document.getElementById('bw-chart'), {
+    ...chartDefaults,
+    data: {
+      labels: filtered.map(d => d.date),
+      datasets: [{ data: filtered.map(d => d.weight), borderColor: CHART_COLOR, backgroundColor: CHART_BG, borderWidth: 2, pointRadius: 3, fill: true, tension: 0.3 }],
+    },
+    options: {
+      ...chartDefaults.options,
+      scales: {
+        ...chartDefaults.options.scales,
+        y: { ticks: { font: { size: 11 } }, title: { display: true, text: unit, font: { size: 11 } } },
+      },
+    },
+  });
+}
+
+async function loadExerciseChart(exerciseId) {
+  const sessionDateMap = {};
+  allSessions.forEach(s => { sessionDateMap[s.id] = s.date; });
+
+  const { data: sets } = await sb
+    .from('sets')
+    .select('weight, unit, session_id')
+    .eq('exercise_id', exerciseId)
+    .in('session_id', allSessions.map(s => s.id))
+    .order('id', { ascending: true });
+
+  currentExerciseSets = (sets || [])
+    .map(s => ({ date: sessionDateMap[s.session_id], weight: s.weight, unit: s.unit }))
+    .filter(s => s.date)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  renderExerciseChart();
+  renderStats();
+}
+
+function renderExerciseChart() {
+  const filtered = filterByPeriod(currentExerciseSets, 'date');
+  const wrap     = document.getElementById('ex-chart-wrap');
+  const ph       = document.getElementById('ex-placeholder');
+
+  if (!filtered.length) {
+    wrap.classList.add('hidden');
+    ph.classList.remove('hidden');
+    ph.textContent = currentExerciseSets.length ? 'No data for this period.' : 'No data yet.';
+    return;
+  }
+  wrap.classList.remove('hidden');
+  ph.classList.add('hidden');
+
+  const byDate = {};
+  filtered.forEach(s => { if (!byDate[s.date] || s.weight > byDate[s.date]) byDate[s.date] = s.weight; });
+  const labels = Object.keys(byDate).sort();
+  const unit   = filtered[0]?.unit || 'kg';
+
+  if (exChartInstance) exChartInstance.destroy();
+  exChartInstance = new Chart(document.getElementById('ex-chart'), {
+    ...chartDefaults,
+    data: {
+      labels,
+      datasets: [{ data: labels.map(d => byDate[d]), borderColor: CHART_COLOR, backgroundColor: CHART_BG, borderWidth: 2, pointRadius: 3, fill: true, tension: 0.3 }],
+    },
+    options: {
+      ...chartDefaults.options,
+      scales: {
+        ...chartDefaults.options.scales,
+        y: { ticks: { font: { size: 11 } }, title: { display: true, text: unit, font: { size: 11 } } },
+      },
+    },
+  });
+}
+
+function renderStats() {
+  document.getElementById('stat-sessions').textContent = allSessions.length || '—';
+
+  if (currentExerciseSets.length) {
+    const max  = Math.max(...currentExerciseSets.map(s => s.weight));
+    const unit = currentExerciseSets[0].unit;
+    document.getElementById('stat-max-weight').textContent = `${max} ${unit}`;
+  } else {
+    document.getElementById('stat-max-weight').textContent = '—';
+  }
+
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 7);
+  const cutoffStr = cutoff.toISOString().split('T')[0];
+  const recent = allBodyWeights.filter(b => b.date >= cutoffStr);
+  if (recent.length) {
+    const avg  = (recent.reduce((s, b) => s + b.weight, 0) / recent.length).toFixed(1);
+    const unit = recent[0].unit;
+    document.getElementById('stat-avg-bw').textContent = `${avg} ${unit}`;
+  } else {
+    document.getElementById('stat-avg-bw').textContent = '—';
+  }
+}
+
+document.querySelectorAll('.period-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.period-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentPeriod = btn.dataset.period;
+    renderBodyWeightChart();
+    if (currentExerciseSets.length) renderExerciseChart();
+  });
+});
+
+document.getElementById('exercise-select').addEventListener('change', e => {
+  const id = e.target.value;
+  if (id) {
+    loadExerciseChart(id);
+  } else {
+    currentExerciseSets = [];
+    if (exChartInstance) { exChartInstance.destroy(); exChartInstance = null; }
+    document.getElementById('ex-chart-wrap').classList.add('hidden');
+    const ph = document.getElementById('ex-placeholder');
+    ph.classList.remove('hidden');
+    ph.textContent = 'Select an exercise above.';
+    renderStats();
+  }
+});
