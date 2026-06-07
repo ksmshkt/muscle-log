@@ -70,12 +70,17 @@ tabs.forEach(btn => {
   });
 });
 
-// ── History delete delegation ──
+// ── History action delegation ──
 document.getElementById('history-list').addEventListener('click', e => {
-  const btn = e.target.closest('.btn-delete-history');
-  if (!btn) return;
-  const date = btn.dataset.date;
-  const sessionIds = btn.dataset.sessionIds ? btn.dataset.sessionIds.split(',').filter(Boolean) : [];
+  const copyBtn = e.target.closest('.btn-copy-history');
+  if (copyBtn) {
+    copyHistoryToLog(copyBtn.dataset.date);
+    return;
+  }
+  const deleteBtn = e.target.closest('.btn-delete-history');
+  if (!deleteBtn) return;
+  const date = deleteBtn.dataset.date;
+  const sessionIds = deleteBtn.dataset.sessionIds ? deleteBtn.dataset.sessionIds.split(',').filter(Boolean) : [];
   if (!confirm(`Delete all data for ${date}?`)) return;
   deleteHistoryByDate(date, sessionIds);
 });
@@ -127,6 +132,7 @@ let customExercises = [];
 let sessionExercises = [];
 let activeCategory = CATEGORIES[0];
 let currentUnit = localStorage.getItem('unit') || 'kg';
+let historyCache = {};
 
 // ── DOM refs (exercise) ──
 const modalExercise   = document.getElementById('modal-exercise');
@@ -515,10 +521,21 @@ function renderHistory(sessions, bodyWeights) {
     (sessionsByDate[date] || []).forEach(session => {
       (session.sets || []).forEach(set => {
         const name = set.exercises?.name || 'Unknown';
-        if (!exerciseMap[name]) exerciseMap[name] = { category: set.exercises?.category || '', sets: [] };
+        if (!exerciseMap[name]) exerciseMap[name] = {
+          category: set.exercises?.category || '',
+          exerciseId: set.exercise_id,
+          sets: [],
+        };
         exerciseMap[name].sets.push(set);
       });
     });
+
+    historyCache[date] = Object.entries(exerciseMap).map(([name, group]) => ({
+      name,
+      category: group.category,
+      id: group.exerciseId || null,
+      sets: group.sets.map(s => ({ weight: s.weight, reps: s.reps })),
+    }));
 
     const bwHTML = bw
       ? `<div class="history-bw">Body Weight: ${bw.weight} ${bw.unit}</div>`
@@ -540,7 +557,10 @@ function renderHistory(sessions, bodyWeights) {
       <div class="card history-card">
         <div class="history-date-row">
           <div class="history-date">${date}</div>
-          <button class="btn-delete-history" data-date="${date}" data-session-ids="${sessionIds}">Delete</button>
+          <div class="history-card-actions">
+            <button class="btn-copy-history" data-date="${date}">Copy to Log</button>
+            <button class="btn-delete-history" data-date="${date}" data-session-ids="${sessionIds}">Delete</button>
+          </div>
         </div>
         ${bwHTML}
         ${exercisesHTML}
@@ -560,6 +580,19 @@ async function deleteHistoryByDate(date, sessionIds) {
   await sb.from('body_weights').delete().eq('user_id', user.id).eq('date', date);
 
   loadHistory();
+}
+
+function copyHistoryToLog(date) {
+  const exercises = historyCache[date];
+  if (!exercises?.length) return;
+
+  if (sessionExercises.length > 0) {
+    if (!confirm(`Overwrite current log with ${date}?`)) return;
+  }
+
+  sessionExercises = exercises.map(ex => ({ ...ex, sets: ex.sets.map(s => ({ ...s })) }));
+  renderExerciseBlocks();
+  document.querySelector('nav button[data-tab="log"]').click();
 }
 
 // ════════════════════════════════════════
