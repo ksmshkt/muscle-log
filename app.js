@@ -115,9 +115,10 @@ btnSignout.addEventListener('click', async () => {
 const PRESETS = {
   Chest:     ['Bench Press', 'Dumbbell Fly', 'Pec Deck'],
   Back:      ['Deadlift', 'Lat Pulldown', 'Bent Over Row'],
-  Legs:      ['Squat', 'Leg Press', 'Leg Curl'],
+  Legs:      ['Squat', 'Leg Press', 'Leg Curl', 'Leg Extension', 'Calf Raise', 'Hip Adduction'],
   Shoulders: ['Shoulder Press', 'Lateral Raise'],
   Arms:      ['Barbell Curl', 'Triceps Pressdown'],
+  Core:      ['Decline Sit-up', 'Crunch', 'Hanging Leg Raise'],
   Cardio:    ['Running', 'Bike'],
 };
 const CATEGORIES = Object.keys(PRESETS);
