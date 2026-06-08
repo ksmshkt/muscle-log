@@ -599,7 +599,7 @@ function copyHistoryToLog(date) {
 // Charts
 // ════════════════════════════════════════
 
-let currentPeriod = 'week';
+let currentPeriod = 'month';
 let bwChartInstance = null;
 let exChartInstance = null;
 let allBodyWeights = [];
@@ -646,7 +646,7 @@ async function loadCharts() {
 
 function filterByPeriod(data, key) {
   if (currentPeriod === 'all') return data;
-  const days = currentPeriod === 'week' ? 7 : 30;
+  const days = currentPeriod === 'month' ? 30 : 365;
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
   const cutoffStr = cutoff.toISOString().split('T')[0];
