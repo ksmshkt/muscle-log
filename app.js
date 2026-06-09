@@ -211,7 +211,7 @@ function renderExerciseList() {
 
 // ── Exercise blocks ──
 function addExercise(name, category, id = null) {
-  sessionExercises.push({ name, category, id, sets: [] });
+  sessionExercises.unshift({ name, category, id, sets: [] });
   renderExerciseBlocks();
 }
 
