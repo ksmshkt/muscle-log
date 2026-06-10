@@ -781,6 +781,24 @@ main {
   transition: background 0.1s;
   border-radius: 4px;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ex-name {
+  flex: 1;
+}
+
+.btn-delete-custom {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .exercise-list li:last-child { border-bottom: none; }

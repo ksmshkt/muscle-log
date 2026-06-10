@@ -198,13 +198,24 @@ function renderExerciseList() {
   const all = [...presets, ...customs];
 
   exerciseListEl.innerHTML = all.length
-    ? all.map(ex => `<li data-name="${ex.name}" data-cat="${ex.category}"${ex.id ? ` data-id="${ex.id}"` : ''}>${ex.name}</li>`).join('')
+    ? all.map(ex => `
+        <li data-name="${ex.name}" data-cat="${ex.category}"${ex.id ? ` data-id="${ex.id}"` : ''}>
+          <span class="ex-name">${ex.name}</span>
+          ${ex.id ? `<button class="btn-delete-custom" data-id="${ex.id}" data-name="${ex.name}">✕</button>` : ''}
+        </li>`).join('')
     : '<li style="color:var(--text-sub);cursor:default">No exercises</li>';
 
   exerciseListEl.querySelectorAll('li[data-name]').forEach(li => {
     li.addEventListener('click', () => {
       addExercise(li.dataset.name, li.dataset.cat, li.dataset.id || null);
       closeModal();
+    });
+  });
+
+  exerciseListEl.querySelectorAll('.btn-delete-custom').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      deleteCustomExercise(btn.dataset.id, btn.dataset.name);
     });
   });
 }
@@ -486,6 +497,14 @@ btnSaveCustom.addEventListener('click', async () => {
     renderExerciseList();
   }
 });
+
+async function deleteCustomExercise(id, name) {
+  if (!confirm(`Delete "${name}"?\nAll logged sets for this exercise will also be deleted.`)) return;
+  const { error } = await sb.from('exercises').delete().eq('id', id);
+  if (error) return;
+  customExercises = customExercises.filter(ex => ex.id !== id);
+  renderExerciseList();
+}
 
 // ════════════════════════════════════════
 // History
