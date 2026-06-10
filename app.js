@@ -220,9 +220,15 @@ function removeExercise(index) {
   renderExerciseBlocks();
 }
 
-function addSet(ei, weight, reps) {
-  sessionExercises[ei].sets.push({ weight, reps });
+function addSet(ei, weight, reps, duration = null) {
+  sessionExercises[ei].sets.push({ weight, reps, duration });
   renderExerciseBlocks();
+}
+
+function setInputType(category) {
+  if (category === 'Cardio') return 'cardio';
+  if (category === 'Core')   return 'core';
+  return 'weight';
 }
 
 function removeSet(ei, si) {
@@ -236,7 +242,22 @@ function renderExerciseBlocks() {
     return;
   }
 
-  exerciseBlocksEl.innerHTML = sessionExercises.map((ex, i) => `
+  exerciseBlocksEl.innerHTML = sessionExercises.map((ex, i) => {
+    const itype = setInputType(ex.category);
+
+    const setDetailHTML = (s) => {
+      if (itype === 'cardio') return `${s.duration} min`;
+      if (itype === 'core')   return `${s.reps} reps`;
+      return `${s.weight} ${currentUnit} × ${s.reps} reps`;
+    };
+
+    const inputRowHTML = itype === 'cardio'
+      ? `<input type="number" class="input-duration" data-ei="${i}" placeholder="0" min="0" step="1" /><span>min</span>`
+      : itype === 'core'
+      ? `<input type="number" class="input-reps" data-ei="${i}" placeholder="0" min="1" step="1" /><span>reps</span>`
+      : `<input type="number" class="input-weight" data-ei="${i}" placeholder="0" min="0" step="0.5" /><span>${currentUnit}</span><span class="set-sep">×</span><input type="number" class="input-reps" data-ei="${i}" placeholder="0" min="1" step="1" /><span>reps</span>`;
+
+    return `
     <div class="exercise-block">
       <div class="exercise-block-header">
         <div>
@@ -249,22 +270,19 @@ function renderExerciseBlocks() {
         ${ex.sets.map((s, j) => `
           <div class="set-row">
             <span class="set-number">Set ${j + 1}</span>
-            <span class="set-detail">${s.weight} ${currentUnit} × ${s.reps} reps</span>
+            <span class="set-detail">${setDetailHTML(s)}</span>
             <button class="btn-copy-set" data-ei="${i}" data-si="${j}" title="Copy">⎘</button>
             <button class="btn-delete-set" data-ei="${i}" data-si="${j}">✕</button>
           </div>
         `).join('')}
       </div>
       <div class="set-input-row">
-        <input type="number" class="input-weight" data-ei="${i}" placeholder="0" min="0" step="0.5" />
-        <span>${currentUnit}</span>
-        <span class="set-sep">×</span>
-        <input type="number" class="input-reps" data-ei="${i}" placeholder="0" min="1" step="1" />
-        <span>reps</span>
+        ${inputRowHTML}
         <button class="btn-add-set" data-ei="${i}">+ Add Set</button>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 
   exerciseBlocksEl.querySelectorAll('.btn-remove-exercise').forEach(btn => {
     btn.addEventListener('click', () => removeExercise(+btn.dataset.i));
@@ -272,28 +290,54 @@ function renderExerciseBlocks() {
 
   exerciseBlocksEl.querySelectorAll('.btn-add-set').forEach(btn => {
     btn.addEventListener('click', () => {
-      const ei = +btn.dataset.ei;
-      const weight = parseFloat(exerciseBlocksEl.querySelector(`.input-weight[data-ei="${ei}"]`).value);
-      const reps   = parseInt(exerciseBlocksEl.querySelector(`.input-reps[data-ei="${ei}"]`).value);
-      if (!weight || !reps) return;
-      addSet(ei, weight, reps);
+      const ei    = +btn.dataset.ei;
+      const itype = setInputType(sessionExercises[ei].category);
+      if (itype === 'cardio') {
+        const duration = parseInt(exerciseBlocksEl.querySelector(`.input-duration[data-ei="${ei}"]`).value);
+        if (!duration) return;
+        addSet(ei, null, null, duration);
+      } else if (itype === 'core') {
+        const reps = parseInt(exerciseBlocksEl.querySelector(`.input-reps[data-ei="${ei}"]`).value);
+        if (!reps) return;
+        addSet(ei, null, reps, null);
+      } else {
+        const weight = parseFloat(exerciseBlocksEl.querySelector(`.input-weight[data-ei="${ei}"]`).value);
+        const reps   = parseInt(exerciseBlocksEl.querySelector(`.input-reps[data-ei="${ei}"]`).value);
+        if (!weight || !reps) return;
+        addSet(ei, weight, reps, null);
+      }
     });
   });
 
   exerciseBlocksEl.querySelectorAll('.input-reps').forEach(input => {
     input.addEventListener('keydown', e => {
       if (e.key !== 'Enter') return;
-      const ei     = +input.dataset.ei;
-      const weight = parseFloat(exerciseBlocksEl.querySelector(`.input-weight[data-ei="${ei}"]`).value);
-      const reps   = parseInt(input.value);
-      if (weight && reps) addSet(ei, weight, reps);
+      const ei    = +input.dataset.ei;
+      const itype = setInputType(sessionExercises[ei].category);
+      if (itype === 'core') {
+        const reps = parseInt(input.value);
+        if (reps) addSet(ei, null, reps, null);
+      } else {
+        const weight = parseFloat(exerciseBlocksEl.querySelector(`.input-weight[data-ei="${ei}"]`).value);
+        const reps   = parseInt(input.value);
+        if (weight && reps) addSet(ei, weight, reps, null);
+      }
+    });
+  });
+
+  exerciseBlocksEl.querySelectorAll('.input-duration').forEach(input => {
+    input.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      const ei       = +input.dataset.ei;
+      const duration = parseInt(input.value);
+      if (duration) addSet(ei, null, null, duration);
     });
   });
 
   exerciseBlocksEl.querySelectorAll('.btn-copy-set').forEach(btn => {
     btn.addEventListener('click', () => {
-      const { weight, reps } = sessionExercises[+btn.dataset.ei].sets[+btn.dataset.si];
-      addSet(+btn.dataset.ei, weight, reps);
+      const { weight, reps, duration } = sessionExercises[+btn.dataset.ei].sets[+btn.dataset.si];
+      addSet(+btn.dataset.ei, weight, reps, duration);
     });
   });
 
@@ -383,8 +427,9 @@ async function saveExercise() {
       ex.sets.map(s => ({
         session_id: session.id,
         exercise_id: exerciseId,
-        weight: s.weight,
-        reps: s.reps,
+        weight: s.weight ?? null,
+        reps: s.reps ?? null,
+        duration: s.duration ?? null,
         unit: currentUnit,
       }))
     );
@@ -472,7 +517,7 @@ async function loadHistory() {
   const sessionIds = (sessions || []).map(s => s.id);
   const [{ data: sets }, { data: exercises }] = await Promise.all([
     sb.from('sets')
-      .select('session_id, exercise_id, weight, reps, unit')
+      .select('session_id, exercise_id, weight, reps, duration, unit')
       .in('session_id', sessionIds)
       .order('id', { ascending: true }),
     sb.from('exercises')
@@ -544,12 +589,18 @@ function renderHistory(sessions, bodyWeights) {
     const exercisesHTML = Object.entries(exerciseMap).map(([name, group]) => `
       <div class="history-exercise">
         <div class="history-exercise-name">${name}<span class="history-exercise-cat">${group.category}</span></div>
-        ${group.sets.map((s, i) => `
+        ${group.sets.map((s, i) => {
+          const detail = s.duration != null
+            ? `${s.duration} min`
+            : s.weight == null
+            ? `${s.reps} reps`
+            : `${s.weight} ${s.unit} × ${s.reps} reps`;
+          return `
           <div class="history-set-row">
             <span class="set-number">Set ${i + 1}</span>
-            <span>${s.weight} ${s.unit} × ${s.reps} reps</span>
-          </div>
-        `).join('')}
+            <span>${detail}</span>
+          </div>`;
+        }).join('')}
       </div>
     `).join('');
 
