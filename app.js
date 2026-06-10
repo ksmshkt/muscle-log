@@ -627,13 +627,13 @@ function renderHistory(sessions, bodyWeights) {
       <div class="card history-card">
         <div class="history-date-row">
           <div class="history-date">${date}</div>
+          ${bw ? `<span class="history-bw-inline">${bw.weight} ${bw.unit}</span>` : ''}
           <div class="history-card-actions">
             <button class="btn-copy-history" data-date="${date}">Copy to Log</button>
             <button class="btn-delete-history" data-date="${date}" data-session-ids="${sessionIds}">Delete</button>
           </div>
         </div>
-        ${bwHTML}
-        ${exercisesHTML}
+        <div class="history-exercises-grid">${exercisesHTML}</div>
       </div>
     `;
   }).join('');

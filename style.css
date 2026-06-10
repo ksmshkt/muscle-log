@@ -377,10 +377,11 @@ main {
   background: rgba(239, 68, 68, 0.12);
 }
 
-.history-bw {
-  font-size: 13px;
+.history-bw-inline {
+  font-size: 14px;
   color: var(--text-sub);
-  margin-bottom: 10px;
+  margin-left: auto;
+  margin-right: 8px;
 }
 
 .history-exercise {
@@ -864,6 +865,45 @@ main {
   /* Save Exercise: 30% centered */
   #btn-save-exercise {
     width: 30%;
+  }
+
+  /* History: centered narrow layout */
+  #page-history #history-list {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  /* History: 2-column exercise grid */
+  .history-exercises-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 24px;
+    align-items: start;
+  }
+
+  .history-exercises-grid .history-exercise {
+    margin-bottom: 0;
+  }
+
+  /* History: date left | bw center | buttons right */
+  .history-date-row {
+    justify-content: flex-start;
+  }
+
+  .history-date {
+    flex: 1;
+  }
+
+  .history-bw-inline {
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .history-card-actions {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
   }
 
   /* Modal: centered dialog */
