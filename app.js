@@ -598,7 +598,7 @@ function renderHistory(sessions, bodyWeights) {
       name,
       category: group.category,
       id: group.exerciseId || null,
-      sets: group.sets.map(s => ({ weight: s.weight, reps: s.reps })),
+      sets: group.sets.map(s => ({ weight: s.weight, reps: s.reps, duration: s.duration })),
     }));
 
     const bwHTML = bw
@@ -609,9 +609,10 @@ function renderHistory(sessions, bodyWeights) {
       <div class="history-exercise">
         <div class="history-exercise-name">${name}<span class="history-exercise-cat">${group.category}</span></div>
         ${group.sets.map((s, i) => {
-          const detail = s.duration != null
+          const itype = setInputType(group.category);
+          const detail = (itype === 'cardio' || s.duration != null)
             ? `${s.duration} min`
-            : s.weight == null
+            : (itype === 'core' || s.weight == null)
             ? `${s.reps} reps`
             : `${s.weight} ${s.unit} × ${s.reps} reps`;
           return `
