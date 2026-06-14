@@ -623,6 +623,17 @@ main {
   background: rgba(62, 168, 255, 0.06);
 }
 
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+  border: none;
+  margin-top: 4px;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #dc2626;
+}
+
 /* ── Add Exercise button ── */
 .btn-add-exercise {
   width: 100%;

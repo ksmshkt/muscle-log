@@ -124,8 +124,23 @@
 
       <div id="page-data" class="page">
         <div class="card">
-          <h2>Data Management</h2>
-          <p class="placeholder">Export / Import coming soon.</p>
+          <h2>Export</h2>
+          <p class="placeholder">Download all your data as a JSON file.</p>
+          <button class="btn btn-primary" id="btn-export">Export JSON</button>
+        </div>
+        <div class="card">
+          <h2>Import</h2>
+          <p class="placeholder">Restore data from a previously exported JSON file.</p>
+          <label class="btn btn-outline" id="label-import">
+            Select JSON file
+            <input type="file" id="input-import" accept=".json" style="display:none" />
+          </label>
+          <p id="import-status" class="placeholder hidden"></p>
+        </div>
+        <div class="card">
+          <h2>Delete All Data</h2>
+          <p class="placeholder">Permanently delete all sessions, sets, and body weights.</p>
+          <button class="btn btn-danger" id="btn-delete-all">Delete All</button>
         </div>
       </div>
     </main>
