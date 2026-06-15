@@ -70,20 +70,6 @@ tabs.forEach(btn => {
   });
 });
 
-// ── History action delegation ──
-document.getElementById('history-list').addEventListener('click', e => {
-  const copyBtn = e.target.closest('.btn-copy-history');
-  if (copyBtn) {
-    copyHistoryToLog(copyBtn.dataset.date);
-    return;
-  }
-  const deleteBtn = e.target.closest('.btn-delete-history');
-  if (!deleteBtn) return;
-  const date = deleteBtn.dataset.date;
-  const sessionIds = deleteBtn.dataset.sessionIds ? deleteBtn.dataset.sessionIds.split(',').filter(Boolean) : [];
-  if (!confirm(`Delete all data for ${date}?`)) return;
-  deleteHistoryByDate(date, sessionIds);
-});
 
 // ── Auth state ──
 sb.auth.onAuthStateChange((_event, session) => {
@@ -133,6 +119,12 @@ let sessionExercises = [];
 let activeCategory = CATEGORIES[0];
 let currentUnit = localStorage.getItem('unit') || 'kg';
 let historyCache = {};
+let calendarYear      = new Date().getFullYear();
+let calendarMonth     = new Date().getMonth();
+let calBwByDate       = {};
+let calSessionsByDate = {};
+let calAllDates       = new Set();
+let calActiveDate     = null;
 
 // ── DOM refs (exercise) ──
 const modalExercise   = document.getElementById('modal-exercise');
@@ -511,9 +503,6 @@ async function deleteCustomExercise(id, name) {
 // ════════════════════════════════════════
 
 async function loadHistory() {
-  const historyListEl = document.getElementById('history-list');
-  historyListEl.innerHTML = '<p class="placeholder">Loading...</p>';
-
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return;
 
@@ -529,7 +518,7 @@ async function loadHistory() {
   ]);
 
   if (!sessions?.length && !bodyWeights?.length) {
-    renderHistory([], []);
+    renderCalendar([], []);
     return;
   }
 
@@ -553,91 +542,119 @@ async function loadHistory() {
       .map(set => ({ ...set, exercises: exMap[set.exercise_id] || null })),
   }));
 
-  renderHistory(sessionsWithSets, bodyWeights || []);
+  renderCalendar(sessionsWithSets, bodyWeights || []);
 }
 
-function renderHistory(sessions, bodyWeights) {
-  const historyListEl = document.getElementById('history-list');
+function buildCalExerciseMap(date) {
+  const exerciseMap = {};
+  (calSessionsByDate[date] || []).forEach(session => {
+    (session.sets || []).forEach(set => {
+      const name = set.exercises?.name || 'Unknown';
+      if (!exerciseMap[name]) exerciseMap[name] = {
+        category: set.exercises?.category || '',
+        exerciseId: set.exercise_id,
+        sets: [],
+      };
+      exerciseMap[name].sets.push(set);
+    });
+  });
+  return exerciseMap;
+}
 
-  if (!sessions.length && !bodyWeights.length) {
-    historyListEl.innerHTML = '<p class="placeholder">No history yet.</p>';
-    return;
-  }
+function renderCalendar(sessions, bodyWeights) {
+  calBwByDate = {};
+  bodyWeights.forEach(bw => { calBwByDate[bw.date] = bw; });
 
-  const bwByDate = {};
-  bodyWeights.forEach(bw => { bwByDate[bw.date] = bw; });
-
-  const allDates = [...new Set([
-    ...sessions.map(s => s.date),
-    ...bodyWeights.map(b => b.date),
-  ])].sort((a, b) => b.localeCompare(a));
-
-  const sessionsByDate = {};
+  calSessionsByDate = {};
   sessions.forEach(s => {
-    (sessionsByDate[s.date] = sessionsByDate[s.date] || []).push(s);
+    (calSessionsByDate[s.date] = calSessionsByDate[s.date] || []).push(s);
   });
 
-  historyListEl.innerHTML = allDates.map(date => {
-    const bw = bwByDate[date];
-    const sessionIds = (sessionsByDate[date] || []).map(s => s.id).join(',');
+  calAllDates = new Set([
+    ...sessions.map(s => s.date),
+    ...bodyWeights.map(b => b.date),
+  ]);
 
-    const exerciseMap = {};
-    (sessionsByDate[date] || []).forEach(session => {
-      (session.sets || []).forEach(set => {
-        const name = set.exercises?.name || 'Unknown';
-        if (!exerciseMap[name]) exerciseMap[name] = {
-          category: set.exercises?.category || '',
-          exerciseId: set.exercise_id,
-          sets: [],
-        };
-        exerciseMap[name].sets.push(set);
-      });
-    });
-
+  historyCache = {};
+  calAllDates.forEach(date => {
+    const exerciseMap = buildCalExerciseMap(date);
     historyCache[date] = Object.entries(exerciseMap).map(([name, group]) => ({
       name,
       category: group.category,
       id: group.exerciseId || null,
       sets: group.sets.map(s => ({ weight: s.weight, reps: s.reps, duration: s.duration })),
     }));
+  });
 
-    const bwHTML = bw
-      ? `<div class="history-bw">Body Weight: ${bw.weight} ${bw.unit}</div>`
-      : '';
+  renderCalendarGrid();
+}
 
-    const exercisesHTML = Object.entries(exerciseMap).map(([name, group]) => `
-      <div class="history-exercise">
-        <div class="history-exercise-name">${name}<span class="history-exercise-cat">${group.category}</span></div>
-        ${group.sets.map((s, i) => {
-          const itype = setInputType(group.category);
-          const detail = (itype === 'cardio' || s.duration != null)
-            ? `${s.duration} min`
-            : (itype === 'core' || s.weight == null)
-            ? `${s.reps} reps`
-            : `${s.weight} ${s.unit} × ${s.reps} reps`;
-          return `
-          <div class="history-set-row">
-            <span class="set-number">Set ${i + 1}</span>
-            <span>${detail}</span>
-          </div>`;
-        }).join('')}
-      </div>
-    `).join('');
+function renderCalendarGrid() {
+  const year  = calendarYear;
+  const month = calendarMonth;
+  document.getElementById('cal-month-label').textContent =
+    new Date(year, month, 1).toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
 
-    return `
-      <div class="card history-card">
-        <div class="history-date-row">
-          <div class="history-date">${date}</div>
-          ${bw ? `<span class="history-bw-inline">${bw.weight} ${bw.unit}</span>` : ''}
-          <div class="history-card-actions">
-            <button class="btn-copy-history" data-date="${date}">Copy to Log</button>
-            <button class="btn-delete-history" data-date="${date}" data-session-ids="${sessionIds}">Delete</button>
-          </div>
-        </div>
-        <div class="history-exercises-grid">${exercisesHTML}</div>
-      </div>
-    `;
-  }).join('');
+  const firstDow    = (new Date(year, month, 1).getDay() + 6) % 7;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const todayStr    = today();
+
+  let html = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    .map(d => `<div class="cal-header">${d}</div>`).join('');
+
+  for (let i = 0; i < firstDow; i++) html += `<div class="cal-day cal-empty"></div>`;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const hasData = calAllDates.has(ds);
+    const isToday = ds === todayStr;
+    html += `<div class="cal-day${hasData ? ' cal-has-data' : ''}${isToday ? ' cal-today' : ''}"${hasData ? ` data-date="${ds}"` : ''}>
+      <span class="cal-day-num">${d}</span>
+      ${hasData ? '<span class="cal-mark"></span>' : ''}
+    </div>`;
+  }
+
+  document.getElementById('calendar-grid').innerHTML = html;
+}
+
+function openHistoryModal(date) {
+  calActiveDate = date;
+
+  const bw = calBwByDate[date];
+  const exerciseMap = buildCalExerciseMap(date);
+
+  document.getElementById('modal-history-title').textContent =
+    new Date(date + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const bwHTML = bw
+    ? `<div class="modal-history-bw">${bw.weight} ${bw.unit}</div>`
+    : '';
+
+  const exercisesHTML = Object.entries(exerciseMap).map(([name, group]) => `
+    <div class="history-exercise">
+      <div class="history-exercise-name">${name}<span class="history-exercise-cat">${group.category}</span></div>
+      ${group.sets.map((s, i) => {
+        const itype = setInputType(group.category);
+        const detail = (itype === 'cardio' || s.duration != null)
+          ? `${s.duration} min`
+          : (itype === 'core' || s.weight == null)
+          ? `${s.reps} reps`
+          : `${s.weight} ${s.unit} × ${s.reps} reps`;
+        return `<div class="history-set-row">
+          <span class="set-number">Set ${i + 1}</span>
+          <span>${detail}</span>
+        </div>`;
+      }).join('')}
+    </div>
+  `).join('');
+
+  document.getElementById('modal-history-body').innerHTML = bwHTML + exercisesHTML;
+  document.getElementById('modal-history').classList.remove('hidden');
+}
+
+function closeHistoryModal() {
+  document.getElementById('modal-history').classList.add('hidden');
+  calActiveDate = null;
 }
 
 async function deleteHistoryByDate(date, sessionIds) {
@@ -995,3 +1012,39 @@ document.getElementById('input-import').addEventListener('change', e => {
   if (e.target.files[0]) importData(e.target.files[0]);
 });
 document.getElementById('btn-delete-all').addEventListener('click', deleteAllData);
+
+// ── Calendar ──
+document.getElementById('calendar-grid').addEventListener('click', e => {
+  const day = e.target.closest('.cal-has-data');
+  if (day?.dataset.date) openHistoryModal(day.dataset.date);
+});
+
+document.getElementById('cal-prev').addEventListener('click', () => {
+  if (--calendarMonth < 0) { calendarMonth = 11; calendarYear--; }
+  renderCalendarGrid();
+});
+
+document.getElementById('cal-next').addEventListener('click', () => {
+  if (++calendarMonth > 11) { calendarMonth = 0; calendarYear++; }
+  renderCalendarGrid();
+});
+
+document.getElementById('modal-history-close').addEventListener('click', closeHistoryModal);
+document.getElementById('modal-history-overlay').addEventListener('click', closeHistoryModal);
+
+document.getElementById('modal-history-copy').addEventListener('click', () => {
+  if (!calActiveDate) return;
+  const date = calActiveDate;
+  closeHistoryModal();
+  copyHistoryToLog(date);
+});
+
+document.getElementById('modal-history-delete').addEventListener('click', async () => {
+  if (!calActiveDate) return;
+  const date = calActiveDate;
+  const sessions = calSessionsByDate[date] || [];
+  const ids = sessions.map(s => s.id);
+  if (!confirm(`Delete all data for ${date}?`)) return;
+  closeHistoryModal();
+  await deleteHistoryByDate(date, ids);
+});

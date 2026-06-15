@@ -76,7 +76,12 @@
       </div>
 
       <div id="page-history" class="page">
-        <div id="history-list"></div>
+        <div class="calendar-nav">
+          <button id="cal-prev" class="cal-nav-btn">‹</button>
+          <span id="cal-month-label"></span>
+          <button id="cal-next" class="cal-nav-btn">›</button>
+        </div>
+        <div class="calendar-grid" id="calendar-grid"></div>
       </div>
 
       <div id="page-charts" class="page">
@@ -144,6 +149,22 @@
         </div>
       </div>
     </main>
+
+    <!-- ── History detail modal ── -->
+    <div id="modal-history" class="modal hidden">
+      <div class="modal-overlay" id="modal-history-overlay"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <span id="modal-history-title"></span>
+          <button class="modal-close" id="modal-history-close">✕</button>
+        </div>
+        <div class="modal-history-actions">
+          <button class="btn btn-outline" id="modal-history-copy">Copy to Log</button>
+          <button class="btn btn-danger" id="modal-history-delete">Delete</button>
+        </div>
+        <div id="modal-history-body"></div>
+      </div>
+    </div>
 
     <!-- ── Exercise picker modal ── -->
     <div id="modal-exercise" class="modal hidden">
