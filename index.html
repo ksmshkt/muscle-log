@@ -43,49 +43,21 @@
 
     <nav>
       <button class="active" data-tab="log">Log</button>
-      <button data-tab="history">History</button>
       <button data-tab="charts">Charts</button>
       <button data-tab="data">Data</button>
     </nav>
 
     <main>
       <div id="page-log" class="page active">
-        <div class="log-top-row">
-          <div class="log-date-section">
-            <label for="log-date">Date</label>
-            <div class="log-date-nav">
-              <button class="date-nav-btn" id="btn-date-prev">‹</button>
-              <input type="date" id="log-date" />
-              <button class="date-nav-btn" id="btn-date-next">›</button>
-            </div>
+        <input type="date" id="log-date" style="display:none" />
+        <div class="log-calendar-section">
+          <div class="calendar-nav">
+            <button class="cal-nav-btn" id="cal-prev">‹</button>
+            <span id="cal-month-label"></span>
+            <button class="cal-nav-btn" id="cal-next">›</button>
           </div>
-          <div class="unit-toggle">
-            <button class="unit-btn active" data-unit="kg">kg</button>
-            <button class="unit-btn" data-unit="lbs">lbs</button>
-          </div>
-          <div class="log-bw-section">
-            <label for="input-body-weight">Body Weight</label>
-            <input type="number" id="input-body-weight" placeholder="0.0" min="0" step="0.1" />
-            <span id="body-weight-unit-label">kg</span>
-            <button class="btn-save-bw" id="btn-save-body-weight">Save</button>
-          </div>
+          <div class="calendar-grid" id="calendar-grid"></div>
         </div>
-        <div class="log-toolbar">
-          <button class="btn-add-exercise" id="btn-add-exercise">+ Add Exercise</button>
-        </div>
-        <div id="exercise-blocks"></div>
-        <div class="log-action-row">
-          <button class="btn btn-primary" id="btn-save-exercise">Save Exercise</button>
-        </div>
-      </div>
-
-      <div id="page-history" class="page">
-        <div class="calendar-nav">
-          <button id="cal-prev" class="cal-nav-btn">‹</button>
-          <span id="cal-month-label"></span>
-          <button id="cal-next" class="cal-nav-btn">›</button>
-        </div>
-        <div class="calendar-grid" id="calendar-grid"></div>
       </div>
 
       <div id="page-charts" class="page">
@@ -154,19 +126,34 @@
       </div>
     </main>
 
-    <!-- ── History detail modal ── -->
-    <div id="modal-history" class="modal hidden">
-      <div class="modal-overlay" id="modal-history-overlay"></div>
+    <!-- ── Log detail modal ── -->
+    <div id="modal-log" class="modal hidden">
+      <div class="modal-overlay" id="modal-log-overlay"></div>
       <div class="modal-content">
         <div class="modal-header">
-          <span id="modal-history-title"></span>
-          <button class="modal-close" id="modal-history-close">✕</button>
+          <button class="modal-date-nav" id="modal-date-prev">‹</button>
+          <span id="modal-log-date"></span>
+          <button class="modal-date-nav" id="modal-date-next">›</button>
+          <button class="modal-close" id="modal-log-close">✕</button>
         </div>
-        <div class="modal-history-actions">
-          <button class="btn btn-outline" id="modal-history-copy">Copy to Log</button>
-          <button class="btn btn-danger" id="modal-history-delete">Delete</button>
+        <div class="modal-log-top">
+          <div class="unit-toggle">
+            <button class="unit-btn active" data-unit="kg">kg</button>
+            <button class="unit-btn" data-unit="lbs">lbs</button>
+          </div>
+          <div class="log-bw-section">
+            <label for="input-body-weight">Body Weight</label>
+            <input type="number" id="input-body-weight" placeholder="0.0" min="0" step="0.1" />
+            <span id="body-weight-unit-label">kg</span>
+            <button class="btn-save-bw" id="btn-save-body-weight">Save</button>
+          </div>
         </div>
-        <div id="modal-history-body"></div>
+        <div class="log-toolbar">
+          <button class="btn-add-exercise" id="btn-add-exercise">+ Add</button>
+          <button class="btn btn-primary" id="btn-save-exercise" disabled>Save</button>
+          <button class="btn btn-danger hidden" id="btn-delete-log">Delete</button>
+        </div>
+        <div id="exercise-blocks"></div>
       </div>
     </div>
 

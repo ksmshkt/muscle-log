@@ -22,6 +22,7 @@ let authMode = 'signin';
 function showAuth() {
   authScreen.classList.remove('hidden');
   app.classList.add('hidden');
+  document.getElementById('modal-log').classList.add('hidden');
   sessionExercises = [];
   inputBodyWeight.value = '';
   logDateInput.value = '';
@@ -31,14 +32,34 @@ function today() {
   return new Date().toISOString().split('T')[0];
 }
 
+function formatDateLabel(dateStr) {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric' });
+}
+
 function showApp() {
   authScreen.classList.add('hidden');
   app.classList.remove('hidden');
-  logDateInput.value = today();
+  const t = today();
+  logDateInput.value = t;
   loadCustomExercises();
   sessionExercises = [];
   existingSessionIds = [];
-  loadDateRecord(today());
+  renderCalendarGrid();
+  loadHistory();
+}
+
+function openLogModal(date) {
+  document.getElementById('modal-log-date').textContent = formatDateLabel(date);
+  document.getElementById('modal-log').classList.remove('hidden');
+}
+
+function closeLogModal() {
+  document.getElementById('modal-log').classList.add('hidden');
+  sessionExercises = [];
+  existingSessionIds = [];
+  inputBodyWeight.value = '';
+  renderExerciseBlocks();
+  updateSaveButton();
 }
 
 function setError(msg) {
@@ -67,8 +88,7 @@ tabs.forEach(btn => {
     pages.forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('page-' + btn.dataset.tab).classList.add('active');
-    if (btn.dataset.tab === 'history') loadHistory();
-    if (btn.dataset.tab === 'charts')  loadCharts();
+    if (btn.dataset.tab === 'charts') loadCharts();
   });
 });
 
@@ -120,14 +140,10 @@ let customExercises = [];
 let sessionExercises = [];
 let activeCategory = CATEGORIES[0];
 let currentUnit = localStorage.getItem('unit') || 'kg';
-let historyCache = {};
 let existingSessionIds = [];
-let calendarYear      = new Date().getFullYear();
-let calendarMonth     = new Date().getMonth();
-let calBwByDate       = {};
-let calSessionsByDate = {};
-let calAllDates       = new Set();
-let calActiveDate     = null;
+let calendarYear  = new Date().getFullYear();
+let calendarMonth = new Date().getMonth();
+let calAllDates   = new Set();
 
 // ── DOM refs (exercise) ──
 const modalExercise   = document.getElementById('modal-exercise');
@@ -217,7 +233,7 @@ function renderExerciseList() {
 
 // ── Exercise blocks ──
 function addExercise(name, category, id = null) {
-  sessionExercises.unshift({ name, category, id, sets: [], isEditing: true });
+  sessionExercises.unshift({ name, category, id, sets: [], isEditing: true, isExpanded: true });
   renderExerciseBlocks();
 }
 
@@ -249,8 +265,10 @@ function renderExerciseBlocks() {
   }
 
   exerciseBlocksEl.innerHTML = sessionExercises.map((ex, i) => {
-    const itype   = setInputType(ex.category);
-    const editing = ex.isEditing !== false;
+    const itype    = setInputType(ex.category);
+    const editing  = ex.isEditing !== false;
+    const expanded = editing || ex.isExpanded !== false;
+    const setCount = ex.sets.length;
 
     const setDetailHTML = (s) => {
       if (itype === 'cardio') return `${s.duration} min`;
@@ -264,18 +282,23 @@ function renderExerciseBlocks() {
       ? `<input type="number" class="input-reps" data-ei="${i}" placeholder="0" min="1" step="1" /><span>reps</span>`
       : `<input type="number" class="input-weight" data-ei="${i}" placeholder="0" min="0" step="0.5" /><span>${currentUnit}</span><span class="set-sep">×</span><input type="number" class="input-reps" data-ei="${i}" placeholder="0" min="1" step="1" /><span>reps</span>`;
 
+    const catLabel = (!editing && !expanded && setCount)
+      ? `${ex.category} · ${setCount} set${setCount !== 1 ? 's' : ''}`
+      : ex.category;
+
     return `
     <div class="exercise-block">
-      <div class="exercise-block-header">
+      <div class="exercise-block-header${!editing ? ' accordion-header' : ''}" data-i="${i}">
         <div>
           <div class="exercise-name">${ex.name}</div>
-          <div class="exercise-category">${ex.category}</div>
+          <div class="exercise-category">${catLabel}</div>
         </div>
         <div class="exercise-header-btns">
           ${!editing ? `<button class="btn-edit-exercise" data-i="${i}">Edit</button>` : ''}
           <button class="btn-remove-exercise" data-i="${i}">✕</button>
         </div>
       </div>
+      ${expanded ? `
       <div class="set-list">
         ${ex.sets.map((s, j) => `
           <div class="set-row">
@@ -294,13 +317,24 @@ function renderExerciseBlocks() {
           <button class="btn-add-set" data-ei="${i}">+ Add Set</button>
         </div>
       ` : ''}
+      ` : ''}
     </div>
   `;
   }).join('');
 
+  exerciseBlocksEl.querySelectorAll('.accordion-header').forEach(hdr => {
+    hdr.addEventListener('click', e => {
+      if (e.target.closest('button')) return;
+      const i = +hdr.dataset.i;
+      sessionExercises[i].isExpanded = !sessionExercises[i].isExpanded;
+      renderExerciseBlocks();
+    });
+  });
+
   exerciseBlocksEl.querySelectorAll('.btn-edit-exercise').forEach(btn => {
     btn.addEventListener('click', () => {
       sessionExercises[+btn.dataset.i].isEditing = true;
+      sessionExercises[+btn.dataset.i].isExpanded = true;
       renderExerciseBlocks();
     });
   });
@@ -365,6 +399,8 @@ function renderExerciseBlocks() {
   exerciseBlocksEl.querySelectorAll('.btn-delete-set').forEach(btn => {
     btn.addEventListener('click', () => removeSet(+btn.dataset.ei, +btn.dataset.si));
   });
+
+  updateSaveButton();
 }
 
 // ════════════════════════════════════════
@@ -427,7 +463,7 @@ async function loadDateRecord(date) {
     const ex = exMap[set.exercise_id];
     if (!ex) return;
     if (!exerciseMap[ex.name]) {
-      exerciseMap[ex.name] = { name: ex.name, category: ex.category, id: ex.id, sets: [], isEditing: false };
+      exerciseMap[ex.name] = { name: ex.name, category: ex.category, id: ex.id, sets: [], isEditing: false, isExpanded: false };
       exerciseOrder.push(ex.name);
     }
     exerciseMap[ex.name].sets.push({ weight: set.weight, reps: set.reps, duration: set.duration });
@@ -442,8 +478,15 @@ async function loadDateRecord(date) {
 }
 
 function updateSaveButton() {
-  const btn = document.getElementById('btn-save-exercise');
-  btn.textContent = existingSessionIds.length ? 'Update' : 'Save Exercise';
+  const hasData = existingSessionIds.length > 0;
+  const canSave = hasData
+    ? sessionExercises.some(ex => ex.isEditing)
+    : sessionExercises.some(ex => ex.sets.length > 0);
+
+  const saveBtn = document.getElementById('btn-save-exercise');
+  saveBtn.textContent = hasData ? 'Update' : 'Save';
+  saveBtn.disabled = !canSave;
+  document.getElementById('btn-delete-log').classList.toggle('hidden', !hasData);
 }
 
 async function changeLogDate(newDate) {
@@ -454,22 +497,13 @@ async function changeLogDate(newDate) {
   sessionExercises = [];
   existingSessionIds = [];
   inputBodyWeight.value = '';
+  const d = new Date(newDate);
+  calendarYear  = d.getUTCFullYear();
+  calendarMonth = d.getUTCMonth();
+  renderCalendarGrid();
+  openLogModal(newDate);
   await loadDateRecord(newDate);
 }
-
-logDateInput.addEventListener('change', e => changeLogDate(e.target.value));
-
-document.getElementById('btn-date-prev').addEventListener('click', () => {
-  const d = new Date(logDateInput.value || today());
-  d.setDate(d.getDate() - 1);
-  changeLogDate(d.toISOString().split('T')[0]);
-});
-
-document.getElementById('btn-date-next').addEventListener('click', () => {
-  const d = new Date(logDateInput.value || today());
-  d.setDate(d.getDate() + 1);
-  changeLogDate(d.toISOString().split('T')[0]);
-});
 
 // ── Save exercise ──
 document.getElementById('btn-save-exercise').addEventListener('click', saveExercise);
@@ -546,8 +580,9 @@ async function saveExercise() {
   sessionExercises = [];
   existingSessionIds = [];
   await loadDateRecord(date);
+  calAllDates.add(date);
+  renderCalendarGrid();
   btn.disabled = false;
-  btn.textContent = 'Save Exercise';
   updateSaveButton();
 }
 
@@ -571,6 +606,8 @@ btnSaveBodyWeight.addEventListener('click', async () => {
     unit: currentUnit,
   });
 
+  calAllDates.add(date);
+  renderCalendarGrid();
   inputBodyWeight.value = '';
   btnSaveBodyWeight.disabled = false;
   btnSaveBodyWeight.textContent = 'Save';
@@ -606,7 +643,7 @@ async function deleteCustomExercise(id, name) {
 }
 
 // ════════════════════════════════════════
-// History
+// History / Calendar data
 // ════════════════════════════════════════
 
 async function loadHistory() {
@@ -614,84 +651,14 @@ async function loadHistory() {
   if (!user) return;
 
   const [{ data: sessions }, { data: bodyWeights }] = await Promise.all([
-    sb.from('sessions')
-      .select('id, date')
-      .eq('user_id', user.id)
-      .order('date', { ascending: false }),
-    sb.from('body_weights')
-      .select('date, weight, unit')
-      .eq('user_id', user.id)
-      .order('date', { ascending: false }),
+    sb.from('sessions').select('date').eq('user_id', user.id),
+    sb.from('body_weights').select('date').eq('user_id', user.id),
   ]);
-
-  if (!sessions?.length && !bodyWeights?.length) {
-    renderCalendar([], []);
-    return;
-  }
-
-  const sessionIds = (sessions || []).map(s => s.id);
-  const [{ data: sets }, { data: exercises }] = await Promise.all([
-    sb.from('sets')
-      .select('session_id, exercise_id, weight, reps, duration, unit')
-      .in('session_id', sessionIds)
-      .order('id', { ascending: true }),
-    sb.from('exercises')
-      .select('id, name, category')
-      .eq('user_id', user.id),
-  ]);
-
-  const exMap = Object.fromEntries((exercises || []).map(ex => [ex.id, ex]));
-
-  const sessionsWithSets = (sessions || []).map(s => ({
-    ...s,
-    sets: (sets || [])
-      .filter(set => set.session_id === s.id)
-      .map(set => ({ ...set, exercises: exMap[set.exercise_id] || null })),
-  }));
-
-  renderCalendar(sessionsWithSets, bodyWeights || []);
-}
-
-function buildCalExerciseMap(date) {
-  const exerciseMap = {};
-  (calSessionsByDate[date] || []).forEach(session => {
-    (session.sets || []).forEach(set => {
-      const name = set.exercises?.name || 'Unknown';
-      if (!exerciseMap[name]) exerciseMap[name] = {
-        category: set.exercises?.category || '',
-        exerciseId: set.exercise_id,
-        sets: [],
-      };
-      exerciseMap[name].sets.push(set);
-    });
-  });
-  return exerciseMap;
-}
-
-function renderCalendar(sessions, bodyWeights) {
-  calBwByDate = {};
-  bodyWeights.forEach(bw => { calBwByDate[bw.date] = bw; });
-
-  calSessionsByDate = {};
-  sessions.forEach(s => {
-    (calSessionsByDate[s.date] = calSessionsByDate[s.date] || []).push(s);
-  });
 
   calAllDates = new Set([
-    ...sessions.map(s => s.date),
-    ...bodyWeights.map(b => b.date),
+    ...(sessions || []).map(s => s.date),
+    ...(bodyWeights || []).map(b => b.date),
   ]);
-
-  historyCache = {};
-  calAllDates.forEach(date => {
-    const exerciseMap = buildCalExerciseMap(date);
-    historyCache[date] = Object.entries(exerciseMap).map(([name, group]) => ({
-      name,
-      category: group.category,
-      id: group.exerciseId || null,
-      sets: group.sets.map(s => ({ weight: s.weight, reps: s.reps, duration: s.duration })),
-    }));
-  });
 
   renderCalendarGrid();
 }
@@ -705,6 +672,7 @@ function renderCalendarGrid() {
   const firstDow    = (new Date(year, month, 1).getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const todayStr    = today();
+  const selectedDate = logDateInput.value;
 
   let html = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     .map(d => `<div class="cal-header">${d}</div>`).join('');
@@ -713,55 +681,16 @@ function renderCalendarGrid() {
 
   for (let d = 1; d <= daysInMonth; d++) {
     const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    const hasData = calAllDates.has(ds);
-    const isToday = ds === todayStr;
-    html += `<div class="cal-day${hasData ? ' cal-has-data' : ''}${isToday ? ' cal-today' : ''}"${hasData ? ` data-date="${ds}"` : ''}>
+    const hasData  = calAllDates.has(ds);
+    const isToday  = ds === todayStr;
+    const isSelected = ds === selectedDate;
+    html += `<div class="cal-day${hasData ? ' cal-has-data' : ''}${isToday ? ' cal-today' : ''}${isSelected ? ' cal-selected' : ''}" data-date="${ds}">
       <span class="cal-day-num">${d}</span>
       ${hasData ? '<span class="cal-mark"></span>' : ''}
     </div>`;
   }
 
   document.getElementById('calendar-grid').innerHTML = html;
-}
-
-function openHistoryModal(date) {
-  calActiveDate = date;
-
-  const bw = calBwByDate[date];
-  const exerciseMap = buildCalExerciseMap(date);
-
-  document.getElementById('modal-history-title').textContent =
-    new Date(date + 'T00:00:00').toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-
-  const bwHTML = bw
-    ? `<div class="modal-history-bw">${bw.weight} ${bw.unit}</div>`
-    : '';
-
-  const exercisesHTML = Object.entries(exerciseMap).map(([name, group]) => `
-    <div class="history-exercise">
-      <div class="history-exercise-name">${name}<span class="history-exercise-cat">${group.category}</span></div>
-      ${group.sets.map((s, i) => {
-        const itype = setInputType(group.category);
-        const detail = (itype === 'cardio' || s.duration != null)
-          ? `${s.duration} min`
-          : (itype === 'core' || s.weight == null)
-          ? `${s.reps} reps`
-          : `${s.weight} ${s.unit} × ${s.reps} reps`;
-        return `<div class="history-set-row">
-          <span class="set-number">Set ${i + 1}</span>
-          <span>${detail}</span>
-        </div>`;
-      }).join('')}
-    </div>
-  `).join('');
-
-  document.getElementById('modal-history-body').innerHTML = bwHTML + exercisesHTML;
-  document.getElementById('modal-history').classList.remove('hidden');
-}
-
-function closeHistoryModal() {
-  document.getElementById('modal-history').classList.add('hidden');
-  calActiveDate = null;
 }
 
 async function deleteHistoryByDate(date, sessionIds) {
@@ -774,22 +703,7 @@ async function deleteHistoryByDate(date, sessionIds) {
   }
   await sb.from('body_weights').delete().eq('user_id', user.id).eq('date', date);
 
-  loadHistory();
-}
-
-function copyHistoryToLog(date) {
-  const exercises = historyCache[date];
-  if (!exercises?.length) return;
-
-  if (sessionExercises.length > 0) {
-    if (!confirm(`Overwrite current log with ${date}?`)) return;
-  }
-
-  existingSessionIds = [];
-  sessionExercises = exercises.map(ex => ({ ...ex, sets: ex.sets.map(s => ({ ...s })), isEditing: true }));
-  renderExerciseBlocks();
-  updateSaveButton();
-  document.querySelector('nav button[data-tab="log"]').click();
+  await loadHistory();
 }
 
 // ════════════════════════════════════════
@@ -1111,6 +1025,13 @@ async function deleteAllData() {
   await sb.from('body_weights').delete().eq('user_id', user.id);
   await sb.from('exercises').delete().eq('user_id', user.id).eq('is_preset', false);
 
+  calAllDates = new Set();
+  renderCalendarGrid();
+  sessionExercises = [];
+  existingSessionIds = [];
+  inputBodyWeight.value = '';
+  renderExerciseBlocks();
+  updateSaveButton();
   btn.disabled = false;
   btn.textContent = 'Delete All';
   alert('All data deleted.');
@@ -1124,8 +1045,8 @@ document.getElementById('btn-delete-all').addEventListener('click', deleteAllDat
 
 // ── Calendar ──
 document.getElementById('calendar-grid').addEventListener('click', e => {
-  const day = e.target.closest('.cal-has-data');
-  if (day?.dataset.date) openHistoryModal(day.dataset.date);
+  const day = e.target.closest('.cal-day[data-date]');
+  if (day?.dataset.date) changeLogDate(day.dataset.date);
 });
 
 document.getElementById('cal-prev').addEventListener('click', () => {
@@ -1138,22 +1059,27 @@ document.getElementById('cal-next').addEventListener('click', () => {
   renderCalendarGrid();
 });
 
-document.getElementById('modal-history-close').addEventListener('click', closeHistoryModal);
-document.getElementById('modal-history-overlay').addEventListener('click', closeHistoryModal);
+// ── Log modal ──
+document.getElementById('modal-log-close').addEventListener('click', closeLogModal);
+document.getElementById('modal-log-overlay').addEventListener('click', closeLogModal);
 
-document.getElementById('modal-history-copy').addEventListener('click', () => {
-  if (!calActiveDate) return;
-  const date = calActiveDate;
-  closeHistoryModal();
-  copyHistoryToLog(date);
+document.getElementById('modal-date-prev').addEventListener('click', () => {
+  const d = new Date(logDateInput.value || today());
+  d.setUTCDate(d.getUTCDate() - 1);
+  changeLogDate(d.toISOString().split('T')[0]);
 });
 
-document.getElementById('modal-history-delete').addEventListener('click', async () => {
-  if (!calActiveDate) return;
-  const date = calActiveDate;
-  const sessions = calSessionsByDate[date] || [];
-  const ids = sessions.map(s => s.id);
+document.getElementById('modal-date-next').addEventListener('click', () => {
+  const d = new Date(logDateInput.value || today());
+  d.setUTCDate(d.getUTCDate() + 1);
+  changeLogDate(d.toISOString().split('T')[0]);
+});
+
+// ── Delete log ──
+document.getElementById('btn-delete-log').addEventListener('click', async () => {
+  const date = logDateInput.value || today();
   if (!confirm(`Delete all data for ${date}?`)) return;
-  closeHistoryModal();
+  const ids = [...existingSessionIds];
+  closeLogModal();
   await deleteHistoryByDate(date, ids);
 });
