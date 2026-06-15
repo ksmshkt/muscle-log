@@ -36,7 +36,9 @@ function showApp() {
   app.classList.remove('hidden');
   logDateInput.value = today();
   loadCustomExercises();
-  renderExerciseBlocks();
+  sessionExercises = [];
+  existingSessionIds = [];
+  loadDateRecord(today());
 }
 
 function setError(msg) {
@@ -119,6 +121,7 @@ let sessionExercises = [];
 let activeCategory = CATEGORIES[0];
 let currentUnit = localStorage.getItem('unit') || 'kg';
 let historyCache = {};
+let existingSessionIds = [];
 let calendarYear      = new Date().getFullYear();
 let calendarMonth     = new Date().getMonth();
 let calBwByDate       = {};
@@ -214,7 +217,7 @@ function renderExerciseList() {
 
 // ── Exercise blocks ──
 function addExercise(name, category, id = null) {
-  sessionExercises.unshift({ name, category, id, sets: [] });
+  sessionExercises.unshift({ name, category, id, sets: [], isEditing: true });
   renderExerciseBlocks();
 }
 
@@ -246,7 +249,8 @@ function renderExerciseBlocks() {
   }
 
   exerciseBlocksEl.innerHTML = sessionExercises.map((ex, i) => {
-    const itype = setInputType(ex.category);
+    const itype   = setInputType(ex.category);
+    const editing = ex.isEditing !== false;
 
     const setDetailHTML = (s) => {
       if (itype === 'cardio') return `${s.duration} min`;
@@ -267,25 +271,39 @@ function renderExerciseBlocks() {
           <div class="exercise-name">${ex.name}</div>
           <div class="exercise-category">${ex.category}</div>
         </div>
-        <button class="btn-remove-exercise" data-i="${i}">✕</button>
+        <div class="exercise-header-btns">
+          ${!editing ? `<button class="btn-edit-exercise" data-i="${i}">Edit</button>` : ''}
+          <button class="btn-remove-exercise" data-i="${i}">✕</button>
+        </div>
       </div>
       <div class="set-list">
         ${ex.sets.map((s, j) => `
           <div class="set-row">
             <span class="set-number">Set ${j + 1}</span>
             <span class="set-detail">${setDetailHTML(s)}</span>
-            <button class="btn-copy-set" data-ei="${i}" data-si="${j}" title="Copy">⎘</button>
-            <button class="btn-delete-set" data-ei="${i}" data-si="${j}">✕</button>
+            ${editing ? `
+              <button class="btn-copy-set" data-ei="${i}" data-si="${j}" title="Copy">⎘</button>
+              <button class="btn-delete-set" data-ei="${i}" data-si="${j}">✕</button>
+            ` : ''}
           </div>
         `).join('')}
       </div>
-      <div class="set-input-row">
-        ${inputRowHTML}
-        <button class="btn-add-set" data-ei="${i}">+ Add Set</button>
-      </div>
+      ${editing ? `
+        <div class="set-input-row">
+          ${inputRowHTML}
+          <button class="btn-add-set" data-ei="${i}">+ Add Set</button>
+        </div>
+      ` : ''}
     </div>
   `;
   }).join('');
+
+  exerciseBlocksEl.querySelectorAll('.btn-edit-exercise').forEach(btn => {
+    btn.addEventListener('click', () => {
+      sessionExercises[+btn.dataset.i].isEditing = true;
+      renderExerciseBlocks();
+    });
+  });
 
   exerciseBlocksEl.querySelectorAll('.btn-remove-exercise').forEach(btn => {
     btn.addEventListener('click', () => removeExercise(+btn.dataset.i));
@@ -373,6 +391,72 @@ document.querySelectorAll('.unit-btn').forEach(btn => {
 // Apply saved unit on load
 applyUnit();
 
+// ── Load existing records for selected date ──
+async function loadDateRecord(date) {
+  if (!date) { renderExerciseBlocks(); return; }
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) { renderExerciseBlocks(); return; }
+
+  const { data: sessions } = await sb.from('sessions')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('date', date);
+
+  if (!sessions?.length) {
+    existingSessionIds = [];
+    renderExerciseBlocks();
+    updateSaveButton();
+    return;
+  }
+
+  existingSessionIds = sessions.map(s => s.id);
+
+  const [{ data: sets }, { data: exercises }, { data: bwRow }] = await Promise.all([
+    sb.from('sets')
+      .select('exercise_id, weight, reps, duration, unit')
+      .in('session_id', existingSessionIds)
+      .order('id', { ascending: true }),
+    sb.from('exercises').select('id, name, category').eq('user_id', user.id),
+    sb.from('body_weights').select('weight, unit').eq('user_id', user.id).eq('date', date).maybeSingle(),
+  ]);
+
+  const exMap = Object.fromEntries((exercises || []).map(ex => [ex.id, ex]));
+  const exerciseMap = {};
+  const exerciseOrder = [];
+  (sets || []).forEach(set => {
+    const ex = exMap[set.exercise_id];
+    if (!ex) return;
+    if (!exerciseMap[ex.name]) {
+      exerciseMap[ex.name] = { name: ex.name, category: ex.category, id: ex.id, sets: [], isEditing: false };
+      exerciseOrder.push(ex.name);
+    }
+    exerciseMap[ex.name].sets.push({ weight: set.weight, reps: set.reps, duration: set.duration });
+  });
+
+  sessionExercises = exerciseOrder.map(n => exerciseMap[n]);
+
+  if (bwRow) inputBodyWeight.value = bwRow.weight;
+
+  renderExerciseBlocks();
+  updateSaveButton();
+}
+
+function updateSaveButton() {
+  const btn = document.getElementById('btn-save-exercise');
+  btn.textContent = existingSessionIds.length ? 'Update' : 'Save Exercise';
+}
+
+logDateInput.addEventListener('change', async e => {
+  const newDate = e.target.value;
+  if (sessionExercises.some(ex => ex.isEditing)) {
+    if (!confirm('Load records for this date? Unsaved changes will be lost.')) return;
+  }
+  sessionExercises = [];
+  existingSessionIds = [];
+  inputBodyWeight.value = '';
+  await loadDateRecord(newDate);
+});
+
 // ── Save exercise ──
 document.getElementById('btn-save-exercise').addEventListener('click', saveExercise);
 
@@ -388,6 +472,13 @@ async function saveExercise() {
   btn.textContent = 'Saving...';
 
   const date = logDateInput.value || today();
+
+  // 既存セッションがあれば削除して上書き
+  if (existingSessionIds.length) {
+    await sb.from('sets').delete().in('session_id', existingSessionIds);
+    await sb.from('sessions').delete().in('id', existingSessionIds);
+    existingSessionIds = [];
+  }
 
   const { data: session, error: sessionError } = await sb
     .from('sessions')
@@ -439,9 +530,11 @@ async function saveExercise() {
   }
 
   sessionExercises = [];
-  renderExerciseBlocks();
+  existingSessionIds = [];
+  await loadDateRecord(date);
   btn.disabled = false;
   btn.textContent = 'Save Exercise';
+  updateSaveButton();
 }
 
 // ── Save body weight ──
@@ -678,8 +771,10 @@ function copyHistoryToLog(date) {
     if (!confirm(`Overwrite current log with ${date}?`)) return;
   }
 
-  sessionExercises = exercises.map(ex => ({ ...ex, sets: ex.sets.map(s => ({ ...s })) }));
+  existingSessionIds = [];
+  sessionExercises = exercises.map(ex => ({ ...ex, sets: ex.sets.map(s => ({ ...s })), isEditing: true }));
   renderExerciseBlocks();
+  updateSaveButton();
   document.querySelector('nav button[data-tab="log"]').click();
 }
 

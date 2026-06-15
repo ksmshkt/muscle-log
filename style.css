@@ -805,6 +805,27 @@ main {
   color: var(--danger);
 }
 
+.exercise-header-btns {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-edit-exercise {
+  font-size: 12px;
+  padding: 3px 10px;
+  border: 1px solid var(--primary);
+  color: var(--primary);
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.btn-edit-exercise:hover {
+  background: rgba(62, 168, 255, 0.12);
+}
+
 /* ── Modal ── */
 .modal {
   position: fixed;
