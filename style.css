@@ -428,6 +428,28 @@ main {
   gap: 10px;
 }
 
+.log-date-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.date-nav-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 16px;
+  line-height: 1;
+  padding: 5px 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.date-nav-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .log-date-section label {
   font-size: 13px;
   font-weight: 600;

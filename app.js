@@ -446,15 +446,29 @@ function updateSaveButton() {
   btn.textContent = existingSessionIds.length ? 'Update' : 'Save Exercise';
 }
 
-logDateInput.addEventListener('change', async e => {
-  const newDate = e.target.value;
+async function changeLogDate(newDate) {
   if (sessionExercises.some(ex => ex.isEditing)) {
     if (!confirm('Load records for this date? Unsaved changes will be lost.')) return;
   }
+  logDateInput.value = newDate;
   sessionExercises = [];
   existingSessionIds = [];
   inputBodyWeight.value = '';
   await loadDateRecord(newDate);
+}
+
+logDateInput.addEventListener('change', e => changeLogDate(e.target.value));
+
+document.getElementById('btn-date-prev').addEventListener('click', () => {
+  const d = new Date(logDateInput.value || today());
+  d.setDate(d.getDate() - 1);
+  changeLogDate(d.toISOString().split('T')[0]);
+});
+
+document.getElementById('btn-date-next').addEventListener('click', () => {
+  const d = new Date(logDateInput.value || today());
+  d.setDate(d.getDate() + 1);
+  changeLogDate(d.toISOString().split('T')[0]);
 });
 
 // ── Save exercise ──

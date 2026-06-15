@@ -53,7 +53,11 @@
         <div class="log-top-row">
           <div class="log-date-section">
             <label for="log-date">Date</label>
-            <input type="date" id="log-date" />
+            <div class="log-date-nav">
+              <button class="date-nav-btn" id="btn-date-prev">‹</button>
+              <input type="date" id="log-date" />
+              <button class="date-nav-btn" id="btn-date-next">›</button>
+            </div>
           </div>
           <div class="unit-toggle">
             <button class="unit-btn active" data-unit="kg">kg</button>
