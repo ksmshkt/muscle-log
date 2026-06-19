@@ -141,17 +141,30 @@
             <button class="unit-btn active" data-unit="kg">kg</button>
             <button class="unit-btn" data-unit="lbs">lbs</button>
           </div>
-          <div class="log-bw-section">
-            <label for="input-body-weight">Body Weight</label>
-            <input type="number" id="input-body-weight" placeholder="0.0" min="0" step="0.1" />
-            <span id="body-weight-unit-label">kg</span>
-            <button class="btn-save-bw" id="btn-save-body-weight">Save</button>
+          <div class="modal-bw-center">
+            <div class="log-bw-section">
+              <label for="input-body-weight">Body Weight</label>
+              <div class="bw-input-row">
+                <input type="number" id="input-body-weight" placeholder="0.0" min="0" step="0.1" />
+                <span id="body-weight-unit-label">kg</span>
+              </div>
+            </div>
+          </div>
+          <div class="modal-side-actions">
+            <button class="btn btn-outline btn-side-sm" id="btn-copy-from-date">Copy</button>
+            <button class="btn btn-danger btn-side-sm hidden" id="btn-delete-log">Delete</button>
           </div>
         </div>
-        <div class="log-toolbar">
-          <button class="btn-add-exercise" id="btn-add-exercise">+ Add</button>
-          <button class="btn btn-primary" id="btn-save-exercise" disabled>Save</button>
-          <button class="btn btn-danger hidden" id="btn-delete-log">Delete</button>
+        <div class="log-toolbar-wrap">
+          <div class="log-toolbar">
+            <button class="btn-add-exercise" id="btn-add-exercise">+ Add</button>
+            <button class="btn btn-primary" id="btn-save-exercise" disabled>Save</button>
+          </div>
+          <div id="copy-date-row" class="copy-date-row hidden">
+            <span>Copy from</span>
+            <input type="date" id="copy-date-input" />
+            <button class="copy-date-cancel" id="btn-cancel-copy">✕</button>
+          </div>
         </div>
         <div id="exercise-blocks"></div>
       </div>

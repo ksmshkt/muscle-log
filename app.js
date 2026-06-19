@@ -55,6 +55,7 @@ function openLogModal(date) {
 
 function closeLogModal() {
   document.getElementById('modal-log').classList.add('hidden');
+  document.getElementById('copy-date-row').classList.add('hidden');
   sessionExercises = [];
   existingSessionIds = [];
   inputBodyWeight.value = '';
@@ -158,7 +159,6 @@ const exerciseBlocksEl  = document.getElementById('exercise-blocks');
 const inputBodyWeight     = document.getElementById('input-body-weight');
 const bodyWeightUnitLabel = document.getElementById('body-weight-unit-label');
 const logDateInput        = document.getElementById('log-date');
-const btnSaveBodyWeight   = document.getElementById('btn-save-body-weight');
 
 // ── Load custom exercises from Supabase ──
 async function loadCustomExercises() {
@@ -586,31 +586,25 @@ async function saveExercise() {
   updateSaveButton();
 }
 
-// ── Save body weight ──
-btnSaveBodyWeight.addEventListener('click', async () => {
+// ── Auto-save body weight on blur ──
+inputBodyWeight.addEventListener('blur', async () => {
   const bodyWeightVal = parseFloat(inputBodyWeight.value);
   if (!bodyWeightVal) return;
 
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return;
 
-  btnSaveBodyWeight.disabled = true;
-  btnSaveBodyWeight.textContent = '...';
-
   const date = logDateInput.value || today();
 
-  await sb.from('body_weights').insert({
+  await sb.from('body_weights').upsert({
     user_id: user.id,
     date: date,
     weight: bodyWeightVal,
     unit: currentUnit,
-  });
+  }, { onConflict: 'user_id,date' });
 
   calAllDates.add(date);
   renderCalendarGrid();
-  inputBodyWeight.value = '';
-  btnSaveBodyWeight.disabled = false;
-  btnSaveBodyWeight.textContent = 'Save';
 });
 
 // ── Save custom exercise ──
@@ -645,6 +639,48 @@ async function deleteCustomExercise(id, name) {
 // ════════════════════════════════════════
 // History / Calendar data
 // ════════════════════════════════════════
+
+async function loadExercisesFromDate(sourceDate) {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return false;
+
+  const { data: sessions } = await sb.from('sessions')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('date', sourceDate);
+
+  if (!sessions?.length) return false;
+
+  const sessionIds = sessions.map(s => s.id);
+  const [{ data: sets }, { data: exercises }] = await Promise.all([
+    sb.from('sets')
+      .select('exercise_id, weight, reps, duration, unit')
+      .in('session_id', sessionIds)
+      .order('id', { ascending: true }),
+    sb.from('exercises').select('id, name, category').eq('user_id', user.id),
+  ]);
+
+  const exMap = Object.fromEntries((exercises || []).map(ex => [ex.id, ex]));
+  const exerciseMap = {};
+  const exerciseOrder = [];
+  (sets || []).forEach(set => {
+    const ex = exMap[set.exercise_id];
+    if (!ex) return;
+    if (!exerciseMap[ex.name]) {
+      exerciseMap[ex.name] = {
+        name: ex.name, category: ex.category, id: ex.id,
+        sets: [], isEditing: true, isExpanded: true,
+      };
+      exerciseOrder.push(ex.name);
+    }
+    exerciseMap[ex.name].sets.push({ weight: set.weight, reps: set.reps, duration: set.duration });
+  });
+
+  sessionExercises = exerciseOrder.map(n => exerciseMap[n]);
+  renderExerciseBlocks();
+  updateSaveButton();
+  return true;
+}
 
 async function loadHistory() {
   const { data: { user } } = await sb.auth.getUser();
@@ -1073,6 +1109,40 @@ document.getElementById('modal-date-next').addEventListener('click', () => {
   const d = new Date(logDateInput.value || today());
   d.setUTCDate(d.getUTCDate() + 1);
   changeLogDate(d.toISOString().split('T')[0]);
+});
+
+// ── Copy from date ──
+document.getElementById('btn-copy-from-date').addEventListener('click', () => {
+  const row = document.getElementById('copy-date-row');
+  row.classList.toggle('hidden');
+  if (!row.classList.contains('hidden')) {
+    document.getElementById('copy-date-input').value = '';
+    document.getElementById('copy-date-input').focus();
+  }
+});
+
+document.getElementById('btn-cancel-copy').addEventListener('click', () => {
+  document.getElementById('copy-date-row').classList.add('hidden');
+});
+
+document.getElementById('copy-date-input').addEventListener('change', async e => {
+  const sourceDate = e.target.value;
+  if (!sourceDate) return;
+
+  document.getElementById('copy-date-row').classList.add('hidden');
+  e.target.value = '';
+
+  const currentDate = logDateInput.value || today();
+  if (sourceDate === currentDate) return;
+
+  if (sessionExercises.length > 0 || existingSessionIds.length > 0) {
+    const srcLabel = formatDateLabel(sourceDate);
+    const dstLabel = formatDateLabel(currentDate);
+    if (!confirm(`Copy exercises from ${srcLabel} to ${dstLabel}?\nThis will overwrite the current exercise list.`)) return;
+  }
+
+  const found = await loadExercisesFromDate(sourceDate);
+  if (!found) alert(`No records found for ${formatDateLabel(sourceDate)}.`);
 });
 
 // ── Delete log ──
