@@ -46,6 +46,7 @@ function showApp() {
   existingSessionIds = [];
   renderCalendarGrid();
   loadHistory();
+  changeLogDate(t);
 }
 
 function openLogModal(date) {
@@ -232,8 +233,27 @@ function renderExerciseList() {
 }
 
 // ── Exercise blocks ──
-function addExercise(name, category, id = null) {
-  sessionExercises.unshift({ name, category, id, sets: [], isEditing: true, isExpanded: true });
+async function addExercise(name, category, id = null) {
+  const entry = { name, category, id, sets: [], isEditing: true, isExpanded: true, prevWeight: null, prevReps: null, prevDuration: null };
+  sessionExercises.unshift(entry);
+  renderExerciseBlocks();
+
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user || !sessionExercises.includes(entry)) return;
+
+  const { data: exRow } = await sb.from('exercises').select('id').eq('user_id', user.id).eq('name', name).maybeSingle();
+  if (!exRow || !sessionExercises.includes(entry)) return;
+
+  const currentDate = logDateInput.value || today();
+  const { data: prevSessions } = await sb.from('sessions').select('id').eq('user_id', user.id).lt('date', currentDate).order('date', { ascending: false }).limit(20);
+  if (!prevSessions?.length || !sessionExercises.includes(entry)) return;
+
+  const { data: prevSets } = await sb.from('sets').select('weight, reps, duration').eq('exercise_id', exRow.id).in('session_id', prevSessions.map(s => s.id)).order('id', { ascending: false }).limit(1);
+  if (!prevSets?.length || !sessionExercises.includes(entry)) return;
+
+  entry.prevWeight   = prevSets[0].weight;
+  entry.prevReps     = prevSets[0].reps;
+  entry.prevDuration = prevSets[0].duration;
   renderExerciseBlocks();
 }
 
@@ -276,11 +296,16 @@ function renderExerciseBlocks() {
       return `${s.weight} ${currentUnit} × ${s.reps} reps`;
     };
 
+    const lastSet  = ex.sets.length ? ex.sets[ex.sets.length - 1] : null;
+    const phWeight   = lastSet?.weight   ?? ex.prevWeight   ?? 0;
+    const phReps     = lastSet?.reps     ?? ex.prevReps     ?? 0;
+    const phDuration = lastSet?.duration ?? ex.prevDuration ?? 0;
+
     const inputRowHTML = itype === 'cardio'
-      ? `<input type="number" class="input-duration" data-ei="${i}" placeholder="0" min="0" step="1" /><span>min</span>`
+      ? `<input type="number" class="input-duration" data-ei="${i}" placeholder="${phDuration}" min="0" step="1" /><span>min</span>`
       : itype === 'core'
-      ? `<input type="number" class="input-reps" data-ei="${i}" placeholder="0" min="1" step="1" /><span>reps</span>`
-      : `<input type="number" class="input-weight" data-ei="${i}" placeholder="0" min="0" step="0.5" /><span>${currentUnit}</span><span class="set-sep">×</span><input type="number" class="input-reps" data-ei="${i}" placeholder="0" min="1" step="1" /><span>reps</span>`;
+      ? `<input type="number" class="input-reps" data-ei="${i}" placeholder="${phReps}" min="1" step="1" /><span>reps</span>`
+      : `<input type="number" class="input-weight" data-ei="${i}" placeholder="${phWeight}" min="0" step="0.5" /><span>${currentUnit}</span><span class="set-sep">×</span><input type="number" class="input-reps" data-ei="${i}" placeholder="${phReps}" min="1" step="1" /><span>reps</span>`;
 
     const catLabel = (!editing && !expanded && setCount)
       ? `${ex.category} · ${setCount} set${setCount !== 1 ? 's' : ''}`
@@ -348,16 +373,20 @@ function renderExerciseBlocks() {
       const ei    = +btn.dataset.ei;
       const itype = setInputType(sessionExercises[ei].category);
       if (itype === 'cardio') {
-        const duration = parseInt(exerciseBlocksEl.querySelector(`.input-duration[data-ei="${ei}"]`).value);
+        const durEl  = exerciseBlocksEl.querySelector(`.input-duration[data-ei="${ei}"]`);
+        const duration = parseInt(durEl.value) || parseInt(durEl.placeholder) || 0;
         if (!duration) return;
         addSet(ei, null, null, duration);
       } else if (itype === 'core') {
-        const reps = parseInt(exerciseBlocksEl.querySelector(`.input-reps[data-ei="${ei}"]`).value);
+        const repsEl = exerciseBlocksEl.querySelector(`.input-reps[data-ei="${ei}"]`);
+        const reps   = parseInt(repsEl.value) || parseInt(repsEl.placeholder) || 0;
         if (!reps) return;
         addSet(ei, null, reps, null);
       } else {
-        const weight = parseFloat(exerciseBlocksEl.querySelector(`.input-weight[data-ei="${ei}"]`).value);
-        const reps   = parseInt(exerciseBlocksEl.querySelector(`.input-reps[data-ei="${ei}"]`).value);
+        const wEl    = exerciseBlocksEl.querySelector(`.input-weight[data-ei="${ei}"]`);
+        const repsEl = exerciseBlocksEl.querySelector(`.input-reps[data-ei="${ei}"]`);
+        const weight = parseFloat(wEl.value)    || parseFloat(wEl.placeholder)    || 0;
+        const reps   = parseInt(repsEl.value)   || parseInt(repsEl.placeholder)   || 0;
         if (!weight || !reps) return;
         addSet(ei, weight, reps, null);
       }
@@ -370,11 +399,12 @@ function renderExerciseBlocks() {
       const ei    = +input.dataset.ei;
       const itype = setInputType(sessionExercises[ei].category);
       if (itype === 'core') {
-        const reps = parseInt(input.value);
+        const reps = parseInt(input.value) || parseInt(input.placeholder) || 0;
         if (reps) addSet(ei, null, reps, null);
       } else {
-        const weight = parseFloat(exerciseBlocksEl.querySelector(`.input-weight[data-ei="${ei}"]`).value);
-        const reps   = parseInt(input.value);
+        const wEl    = exerciseBlocksEl.querySelector(`.input-weight[data-ei="${ei}"]`);
+        const weight = parseFloat(wEl.value) || parseFloat(wEl.placeholder) || 0;
+        const reps   = parseInt(input.value) || parseInt(input.placeholder) || 0;
         if (weight && reps) addSet(ei, weight, reps, null);
       }
     });
@@ -384,7 +414,7 @@ function renderExerciseBlocks() {
     input.addEventListener('keydown', e => {
       if (e.key !== 'Enter') return;
       const ei       = +input.dataset.ei;
-      const duration = parseInt(input.value);
+      const duration = parseInt(input.value) || parseInt(input.placeholder) || 0;
       if (duration) addSet(ei, null, null, duration);
     });
   });
@@ -1116,7 +1146,9 @@ document.getElementById('btn-copy-from-date').addEventListener('click', () => {
   const row = document.getElementById('copy-date-row');
   row.classList.toggle('hidden');
   if (!row.classList.contains('hidden')) {
-    document.getElementById('copy-date-input').value = '';
+    const currentDate = logDateInput.value || today();
+    const prevDate = [...calAllDates].filter(d => d < currentDate).sort().at(-1) ?? '';
+    document.getElementById('copy-date-input').value = prevDate;
     document.getElementById('copy-date-input').focus();
   }
 });
@@ -1125,12 +1157,10 @@ document.getElementById('btn-cancel-copy').addEventListener('click', () => {
   document.getElementById('copy-date-row').classList.add('hidden');
 });
 
-document.getElementById('copy-date-input').addEventListener('change', async e => {
-  const sourceDate = e.target.value;
+async function executeCopy(sourceDate) {
   if (!sourceDate) return;
-
   document.getElementById('copy-date-row').classList.add('hidden');
-  e.target.value = '';
+  document.getElementById('copy-date-input').value = '';
 
   const currentDate = logDateInput.value || today();
   if (sourceDate === currentDate) return;
@@ -1143,6 +1173,11 @@ document.getElementById('copy-date-input').addEventListener('change', async e =>
 
   const found = await loadExercisesFromDate(sourceDate);
   if (!found) alert(`No records found for ${formatDateLabel(sourceDate)}.`);
+}
+
+document.getElementById('copy-date-input').addEventListener('change', e => executeCopy(e.target.value));
+document.getElementById('copy-date-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') executeCopy(e.target.value);
 });
 
 // ── Delete log ──

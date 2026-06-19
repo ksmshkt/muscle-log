@@ -152,19 +152,16 @@
           </div>
           <div class="modal-side-actions">
             <button class="btn btn-outline btn-side-sm" id="btn-copy-from-date">Copy</button>
+            <div id="copy-date-row" class="copy-date-row hidden">
+              <input type="date" id="copy-date-input" />
+              <button class="copy-date-cancel" id="btn-cancel-copy">✕</button>
+            </div>
             <button class="btn btn-danger btn-side-sm hidden" id="btn-delete-log">Delete</button>
           </div>
         </div>
-        <div class="log-toolbar-wrap">
-          <div class="log-toolbar">
-            <button class="btn-add-exercise" id="btn-add-exercise">+ Add</button>
-            <button class="btn btn-primary" id="btn-save-exercise" disabled>Save</button>
-          </div>
-          <div id="copy-date-row" class="copy-date-row hidden">
-            <span>Copy from</span>
-            <input type="date" id="copy-date-input" />
-            <button class="copy-date-cancel" id="btn-cancel-copy">✕</button>
-          </div>
+        <div class="log-toolbar">
+          <button class="btn-add-exercise" id="btn-add-exercise">+ Add</button>
+          <button class="btn btn-primary" id="btn-save-exercise" disabled>Save</button>
         </div>
         <div id="exercise-blocks"></div>
       </div>
