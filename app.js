@@ -143,9 +143,10 @@ let sessionExercises = [];
 let activeCategory = CATEGORIES[0];
 let currentUnit = localStorage.getItem('unit') || 'kg';
 let existingSessionIds = [];
-let calendarYear  = new Date().getFullYear();
-let calendarMonth = new Date().getMonth();
-let calAllDates   = new Set();
+let calendarYear    = new Date().getFullYear();
+let calendarMonth   = new Date().getMonth();
+let calSessionDates = new Set();
+let calAllDates     = new Set();
 
 // ── DOM refs (exercise) ──
 const modalExercise   = document.getElementById('modal-exercise');
@@ -607,6 +608,7 @@ async function saveExercise() {
   sessionExercises = [];
   existingSessionIds = [];
   await loadDateRecord(date);
+  calSessionDates.add(date);
   calAllDates.add(date);
   renderCalendarGrid();
   btn.disabled = false;
@@ -718,8 +720,9 @@ async function loadHistory() {
     sb.from('body_weights').select('date').eq('user_id', user.id),
   ]);
 
+  calSessionDates = new Set((sessions || []).map(s => s.date));
   calAllDates = new Set([
-    ...(sessions || []).map(s => s.date),
+    ...calSessionDates,
     ...(bodyWeights || []).map(b => b.date),
   ]);
 
@@ -744,12 +747,14 @@ function renderCalendarGrid() {
 
   for (let d = 1; d <= daysInMonth; d++) {
     const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-    const hasData  = calAllDates.has(ds);
-    const isToday  = ds === todayStr;
+    const hasSession = calSessionDates.has(ds);
+    const hasBwOnly  = !hasSession && calAllDates.has(ds);
+    const isToday    = ds === todayStr;
     const isSelected = ds === selectedDate;
-    html += `<div class="cal-day${hasData ? ' cal-has-data' : ''}${isToday ? ' cal-today' : ''}${isSelected ? ' cal-selected' : ''}" data-date="${ds}">
+    html += `<div class="cal-day${hasSession ? ' cal-has-session' : hasBwOnly ? ' cal-has-bw' : ''}${isToday ? ' cal-today' : ''}${isSelected ? ' cal-selected' : ''}" data-date="${ds}">
       <span class="cal-day-num">${d}</span>
-      ${hasData ? '<span class="cal-mark"></span>' : ''}
+      ${hasSession ? '<span class="cal-mark cal-mark-session"></span>' : ''}
+      ${hasBwOnly  ? '<span class="cal-mark cal-mark-bw"></span>'      : ''}
     </div>`;
   }
 
@@ -1088,6 +1093,7 @@ async function deleteAllData() {
   await sb.from('body_weights').delete().eq('user_id', user.id);
   await sb.from('exercises').delete().eq('user_id', user.id).eq('is_preset', false);
 
+  calSessionDates = new Set();
   calAllDates = new Set();
   renderCalendarGrid();
   sessionExercises = [];
