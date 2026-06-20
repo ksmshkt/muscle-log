@@ -134,10 +134,14 @@ body {
   background: linear-gradient(135deg, var(--primary), var(--primary-d));
   color: #fff;
   margin-top: 4px;
+  box-shadow: 0 2px 8px rgba(62, 168, 255, 0.35);
+  transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
 }
 
 .btn-primary:hover:not(:disabled) {
   background: linear-gradient(135deg, var(--primary-d), #1a44c8);
+  box-shadow: 0 4px 14px rgba(62, 168, 255, 0.45);
+  transform: translateY(-1px);
 }
 
 .auth-error {
@@ -187,12 +191,13 @@ header {
   font-weight: 500;
   color: var(--text-sub);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
 .btn-signout:hover {
   background: var(--bg);
-  color: var(--text);
+  color: var(--danger);
+  border-color: var(--danger);
 }
 
 /* ── Tab bar ── */
@@ -586,11 +591,18 @@ main {
 .copy-date-cancel {
   background: none;
   border: none;
-  color: var(--text-muted);
+  color: var(--text-sub);
   font-size: 16px;
   cursor: pointer;
   padding: 4px 6px;
   line-height: 1;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.copy-date-cancel:hover {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.08);
 }
 
 /* ── Unit toggle ── */
@@ -687,11 +699,16 @@ main {
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
   line-height: 1;
+  box-shadow: 0 1px 4px rgba(62, 168, 255, 0.3);
+  transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
 }
 
-.btn-add-set:hover { background: var(--primary-d); }
+.btn-add-set:hover {
+  background: var(--primary-d);
+  box-shadow: 0 2px 8px rgba(62, 168, 255, 0.4);
+  transform: translateY(-1px);
+}
 
 /* ── Log action row (Save Exercise) ── */
 .log-action-row {
@@ -708,13 +725,15 @@ main {
 
 /* ── Outline button ── */
 .btn-outline {
-  background: none;
+  background: linear-gradient(135deg, rgba(62,168,255,0.04), rgba(62,168,255,0.08));
   border: 1.5px solid var(--primary);
   color: var(--primary);
+  transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
 }
 
 .btn-outline:hover:not(:disabled) {
-  background: rgba(62, 168, 255, 0.06);
+  background: rgba(62, 168, 255, 0.12);
+  transform: translateY(-1px);
 }
 
 .btn-danger {
@@ -722,6 +741,8 @@ main {
   color: #fff;
   border: 1.5px solid transparent;
   margin-top: 4px;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.3);
+  transition: background 0.2s, box-shadow 0.2s, transform 0.15s;
 }
 
 /* ── Calendar in Log tab ── */
@@ -881,22 +902,25 @@ main {
 
 .btn-danger:hover:not(:disabled) {
   background: #dc2626;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+  transform: translateY(-1px);
 }
 
 /* ── Add Exercise button ── */
 .btn-add-exercise {
-  border: 1.5px dashed var(--border);
+  border: 1.5px dashed var(--primary);
   border-radius: var(--radius);
-  background: none;
+  background: rgba(62, 168, 255, 0.04);
   font-weight: 600;
   color: var(--primary);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background 0.15s, box-shadow 0.15s, transform 0.15s;
 }
 
 .btn-add-exercise:hover {
-  background: rgba(62, 168, 255, 0.04);
-  border-color: var(--primary);
+  background: rgba(62, 168, 255, 0.1);
+  box-shadow: 0 2px 8px rgba(62, 168, 255, 0.15);
+  transform: translateY(-1px);
 }
 
 /* ── Accordion ── */
@@ -956,11 +980,13 @@ main {
   cursor: pointer;
   padding: 4px 6px;
   line-height: 1;
-  transition: color 0.15s;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
 }
 
 .btn-remove-exercise:hover {
   color: var(--danger);
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .exercise-header-btns {
@@ -974,14 +1000,17 @@ main {
   padding: 3px 10px;
   border: 1px solid var(--primary);
   color: var(--primary);
-  background: transparent;
+  background: rgba(62, 168, 255, 0.06);
   border-radius: 4px;
   cursor: pointer;
   line-height: 1.4;
+  transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
 }
 
 .btn-edit-exercise:hover {
-  background: rgba(62, 168, 255, 0.12);
+  background: rgba(62, 168, 255, 0.15);
+  box-shadow: 0 1px 4px rgba(62, 168, 255, 0.2);
+  transform: translateY(-1px);
 }
 
 /* ── Modal ── */
@@ -1038,8 +1067,15 @@ main {
   font-size: 18px;
   color: var(--text-sub);
   cursor: pointer;
-  padding: 2px 6px;
+  padding: 4px 8px;
   line-height: 1;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.modal-close:hover {
+  color: var(--danger);
+  background: rgba(239, 68, 68, 0.08);
 }
 
 .modal-date-nav {
