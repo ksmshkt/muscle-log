@@ -312,7 +312,7 @@ function renderExerciseBlocks() {
       : ex.category;
 
     return `
-    <div class="exercise-block">
+    <div class="exercise-block" data-cat="${ex.category}">
       <div class="exercise-block-header${!editing ? ' accordion-header' : ''}" data-i="${i}">
         <div class="exercise-info">
           <div class="exercise-name">${ex.name}</div>

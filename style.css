@@ -9,6 +9,14 @@
   --text-sub:  #666666;
   --radius:    10px;
   --tab-h:     52px;
+
+  --cat-chest:     #ef4444;
+  --cat-back:      #22c55e;
+  --cat-legs:      #8b5cf6;
+  --cat-shoulders: #f97316;
+  --cat-arms:      #ec4899;
+  --cat-core:      #eab308;
+  --cat-cardio:    #06b6d4;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -156,6 +164,18 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+.app-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--primary);
+}
+
+.app-title svg {
+  color: var(--primary);
+  flex-shrink: 0;
 }
 
 .btn-signout {
@@ -889,11 +909,21 @@ main {
 .exercise-block {
   background: var(--surface);
   border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-left-color: var(--cat-color, var(--primary));
   border-radius: var(--radius);
   padding: 14px 16px;
   margin-bottom: 12px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
+
+.exercise-block[data-cat="Chest"]     { --cat-color: var(--cat-chest); }
+.exercise-block[data-cat="Back"]      { --cat-color: var(--cat-back); }
+.exercise-block[data-cat="Legs"]      { --cat-color: var(--cat-legs); }
+.exercise-block[data-cat="Shoulders"] { --cat-color: var(--cat-shoulders); }
+.exercise-block[data-cat="Arms"]      { --cat-color: var(--cat-arms); }
+.exercise-block[data-cat="Core"]      { --cat-color: var(--cat-core); }
+.exercise-block[data-cat="Cardio"]    { --cat-color: var(--cat-cardio); }
 
 .exercise-block-header {
   display: flex;
@@ -1052,10 +1082,18 @@ main {
 }
 
 .category-tab.active {
-  background: var(--primary);
-  border-color: var(--primary);
+  background: var(--cat-color, var(--primary));
+  border-color: var(--cat-color, var(--primary));
   color: #fff;
 }
+
+.category-tab[data-cat="Chest"]     { --cat-color: var(--cat-chest); }
+.category-tab[data-cat="Back"]      { --cat-color: var(--cat-back); }
+.category-tab[data-cat="Legs"]      { --cat-color: var(--cat-legs); }
+.category-tab[data-cat="Shoulders"] { --cat-color: var(--cat-shoulders); }
+.category-tab[data-cat="Arms"]      { --cat-color: var(--cat-arms); }
+.category-tab[data-cat="Core"]      { --cat-color: var(--cat-core); }
+.category-tab[data-cat="Cardio"]    { --cat-color: var(--cat-cardio); }
 
 /* ── Exercise list ── */
 .exercise-list {
