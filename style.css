@@ -1206,6 +1206,8 @@ main {
   }
 
   #modal-log .modal-content {
+    width: 560px;
+    min-width: unset;
     margin-top: 80px;
     height: calc(100dvh - 120px);
     max-height: none;
@@ -1216,5 +1218,14 @@ main {
   #modal-exercise .modal-content {
     width: 340px;
     min-width: unset;
+  }
+
+  #modal-log .modal-content > .modal-log-top,
+  #modal-log .modal-content > .log-toolbar,
+  #modal-log .modal-content > #copy-date-row,
+  #modal-log .modal-content > #exercise-blocks {
+    max-width: 520px;
+    margin-left: auto;
+    margin-right: auto;
   }
 }
