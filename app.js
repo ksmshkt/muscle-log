@@ -314,16 +314,19 @@ function renderExerciseBlocks() {
     return `
     <div class="exercise-block">
       <div class="exercise-block-header${!editing ? ' accordion-header' : ''}" data-i="${i}">
-        <div>
+        <div class="exercise-info">
           <div class="exercise-name">${ex.name}</div>
           <div class="exercise-category">${catLabel}</div>
         </div>
         <div class="exercise-header-btns">
-          ${!editing ? `<button class="btn-edit-exercise" data-i="${i}">Edit</button>` : ''}
+          ${editing ? `
+            <div class="set-input-inline">${inputRowHTML}</div>
+            <button class="btn-add-set" data-ei="${i}">+</button>
+          ` : `<button class="btn-edit-exercise" data-i="${i}">Edit</button>`}
           <button class="btn-remove-exercise" data-i="${i}">✕</button>
         </div>
       </div>
-      ${expanded ? `
+      ${expanded && ex.sets.length ? `
       <div class="set-list">
         ${ex.sets.map((s, j) => `
           <div class="set-row">
@@ -336,12 +339,6 @@ function renderExerciseBlocks() {
           </div>
         `).join('')}
       </div>
-      ${editing ? `
-        <div class="set-input-row">
-          ${inputRowHTML}
-          <button class="btn-add-set" data-ei="${i}">+ Add Set</button>
-        </div>
-      ` : ''}
       ` : ''}
     </div>
   `;
