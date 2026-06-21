@@ -1246,7 +1246,7 @@ document.getElementById('btn-copy-from-date').addEventListener('click', () => {
   row.classList.toggle('hidden');
   if (!row.classList.contains('hidden')) {
     const currentDate = logDateInput.value || today();
-    const prevDate = [...calAllDates].filter(d => d < currentDate).sort().at(-1) ?? '';
+    const prevDate = [...calSessionDates].filter(d => d < currentDate).sort().at(-1) ?? '';
     document.getElementById('copy-date-input').value = prevDate;
     document.getElementById('copy-date-input').focus();
   }
