@@ -787,8 +787,9 @@ async function deleteHistoryByDate(date, sessionIds) {
 // ════════════════════════════════════════
 
 let currentPeriod = 'month';
-let bwChartInstance = null;
-let exChartInstance = null;
+let bwChartInstance   = null;
+let exChartInstance   = null;
+let freqChartInstance = null;
 let allBodyWeights = [];
 let allSessions = [];
 let currentExerciseSets = [];
@@ -828,6 +829,7 @@ async function loadCharts() {
   if (prev) select.value = prev;
 
   renderBodyWeightChart();
+  renderFrequencyChart();
   renderStats();
 }
 
@@ -866,6 +868,91 @@ function renderBodyWeightChart() {
       scales: {
         ...chartDefaults.options.scales,
         y: { ticks: { font: { size: 11 } }, title: { display: true, text: unit, font: { size: 11 } } },
+      },
+    },
+  });
+}
+
+function localDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function getWeekStart(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const dow = d.getDay();
+  d.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));
+  return localDateStr(d);
+}
+
+function renderFrequencyChart() {
+  const wrap = document.getElementById('freq-chart-wrap');
+  const ph   = document.getElementById('freq-placeholder');
+
+  // Group ALL sessions by week start (no period filter on sessions)
+  const weekMap = {};
+  allSessions.forEach(s => {
+    const w = getWeekStart(s.date);
+    weekMap[w] = (weekMap[w] || 0) + 1;
+  });
+
+  // Filter by week start date being within the period
+  let cutoffStr = null;
+  if (currentPeriod !== 'all') {
+    const days = currentPeriod === 'month' ? 30 : 365;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - days);
+    cutoffStr = localDateStr(cutoff);
+  }
+
+  const currentWeek = getWeekStart(localDateStr(new Date()));
+  const sortedWeeks = Object.keys(weekMap).sort();
+  const firstWeek   = cutoffStr
+    ? sortedWeeks.find(w => w >= cutoffStr)
+    : sortedWeeks[0];
+
+  if (!firstWeek) {
+    wrap.classList.add('hidden');
+    ph.classList.remove('hidden');
+    if (freqChartInstance) { freqChartInstance.destroy(); freqChartInstance = null; }
+    return;
+  }
+  wrap.classList.remove('hidden');
+  ph.classList.add('hidden');
+
+  const allWeeks = [];
+  const cur = new Date(firstWeek + 'T00:00:00');
+  const end = new Date(currentWeek + 'T00:00:00');
+  while (cur <= end) {
+    allWeeks.push(localDateStr(cur));
+    cur.setDate(cur.getDate() + 7);
+  }
+
+  const labels = allWeeks.map(w => {
+    const d = new Date(w + 'T00:00:00');
+    return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+  });
+  const data = allWeeks.map(w => weekMap[w] || 0);
+
+  if (freqChartInstance) freqChartInstance.destroy();
+  freqChartInstance = new Chart(document.getElementById('freq-chart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: 'rgba(62,168,255,0.65)',
+        borderColor: '#3ea8ff',
+        borderWidth: 1,
+        borderRadius: 4,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { maxTicksLimit: 8, font: { size: 11 } } },
+        y: { min: 0, ticks: { stepSize: 1, font: { size: 11 } } },
       },
     },
   });
@@ -957,6 +1044,7 @@ document.querySelectorAll('.period-tab').forEach(btn => {
     btn.classList.add('active');
     currentPeriod = btn.dataset.period;
     renderBodyWeightChart();
+    renderFrequencyChart();
     if (currentExerciseSets.length) renderExerciseChart();
   });
 });
