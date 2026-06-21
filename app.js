@@ -55,6 +55,10 @@ function openLogModal(date) {
 }
 
 function closeLogModal() {
+  const bwVal  = parseFloat(inputBodyWeight.value);
+  const bwDate = logDateInput.value || today();
+  saveBodyWeight(bwDate, bwVal);
+
   document.getElementById('modal-log').classList.add('hidden');
   document.getElementById('copy-date-row').classList.add('hidden');
   sessionExercises = [];
@@ -466,6 +470,12 @@ async function loadDateRecord(date) {
     .eq('user_id', user.id)
     .eq('date', date);
 
+  const { data: bwRows } = await sb.from('body_weights')
+    .select('weight, unit').eq('user_id', user.id).eq('date', date)
+    .order('id', { ascending: false }).limit(1);
+  const bwRow = bwRows?.[0];
+  if (bwRow) inputBodyWeight.value = bwRow.weight;
+
   if (!sessions?.length) {
     existingSessionIds = [];
     renderExerciseBlocks();
@@ -475,13 +485,12 @@ async function loadDateRecord(date) {
 
   existingSessionIds = sessions.map(s => s.id);
 
-  const [{ data: sets }, { data: exercises }, { data: bwRow }] = await Promise.all([
+  const [{ data: sets }, { data: exercises }] = await Promise.all([
     sb.from('sets')
       .select('exercise_id, weight, reps, duration, unit')
       .in('session_id', existingSessionIds)
       .order('id', { ascending: true }),
     sb.from('exercises').select('id, name, category').eq('user_id', user.id),
-    sb.from('body_weights').select('weight, unit').eq('user_id', user.id).eq('date', date).maybeSingle(),
   ]);
 
   const exMap = Object.fromEntries((exercises || []).map(ex => [ex.id, ex]));
@@ -498,8 +507,6 @@ async function loadDateRecord(date) {
   });
 
   sessionExercises = exerciseOrder.map(n => exerciseMap[n]);
-
-  if (bwRow) inputBodyWeight.value = bwRow.weight;
 
   renderExerciseBlocks();
   updateSaveButton();
@@ -615,25 +622,27 @@ async function saveExercise() {
   updateSaveButton();
 }
 
-// ── Auto-save body weight on blur ──
-inputBodyWeight.addEventListener('blur', async () => {
-  const bodyWeightVal = parseFloat(inputBodyWeight.value);
-  if (!bodyWeightVal) return;
-
+// ── Auto-save body weight ──
+async function saveBodyWeight(date, val) {
+  if (!val || !date) return;
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return;
-
-  const date = logDateInput.value || today();
-
-  await sb.from('body_weights').upsert({
+  await sb.from('body_weights').delete().eq('user_id', user.id).eq('date', date);
+  const { error } = await sb.from('body_weights').insert({
     user_id: user.id,
-    date: date,
-    weight: bodyWeightVal,
+    date,
+    weight: val,
     unit: currentUnit,
-  }, { onConflict: 'user_id,date' });
-
+  });
+  if (error) { console.error('saveBodyWeight:', error); return; }
   calAllDates.add(date);
   renderCalendarGrid();
+}
+
+inputBodyWeight.addEventListener('blur', () => {
+  const val = parseFloat(inputBodyWeight.value);
+  const date = logDateInput.value || today();
+  saveBodyWeight(date, val);
 });
 
 // ── Save custom exercise ──
