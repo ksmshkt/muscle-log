@@ -46,7 +46,6 @@ function showApp() {
   existingSessionIds = [];
   renderCalendarGrid();
   loadHistory();
-  changeLogDate(t);
 }
 
 function openLogModal(date) {
