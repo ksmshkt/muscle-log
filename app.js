@@ -792,7 +792,9 @@ let exChartInstance   = null;
 let freqChartInstance = null;
 let allBodyWeights = [];
 let allSessions = [];
-let currentExerciseSets = [];
+let currentExerciseSets      = [];
+let currentExerciseId        = null;
+let currentExerciseCategory  = null;
 
 const CHART_COLOR = '#3ea8ff';
 const CHART_BG    = 'rgba(62,168,255,0.08)';
@@ -816,17 +818,30 @@ async function loadCharts() {
   const [{ data: bwData }, { data: sessionsData }, { data: exercisesData }] = await Promise.all([
     sb.from('body_weights').select('date, weight, unit').eq('user_id', user.id).order('date', { ascending: true }),
     sb.from('sessions').select('id, date').eq('user_id', user.id),
-    sb.from('exercises').select('id, name').eq('user_id', user.id).order('name'),
+    sb.from('exercises').select('id, name, category').eq('user_id', user.id).order('name'),
   ]);
 
   allBodyWeights = bwData || [];
   allSessions    = sessionsData || [];
 
-  const select = document.getElementById('exercise-select');
-  const prev   = select.value;
-  select.innerHTML = '<option value="">Select exercise...</option>' +
-    (exercisesData || []).map(ex => `<option value="${ex.id}">${ex.name}</option>`).join('');
-  if (prev) select.value = prev;
+  const sessionIds = allSessions.map(s => s.id);
+  let usedExerciseIds = new Set();
+  if (sessionIds.length) {
+    const { data: setsData } = await sb.from('sets').select('exercise_id').in('session_id', sessionIds);
+    usedExerciseIds = new Set((setsData || []).map(s => s.exercise_id));
+  }
+  const recordedExercises = (exercisesData || []).filter(ex => usedExerciseIds.has(ex.id));
+
+  const CAT_COLORS = { Chest:'#ef4444', Back:'#22c55e', Legs:'#8b5cf6', Shoulders:'#f97316', Arms:'#ec4899', Core:'#eab308', Cardio:'#06b6d4' };
+  const list = document.getElementById('exercise-select-list');
+  list.innerHTML = `<li class="ex-select-item" data-id="">— Select —</li>` +
+    recordedExercises.map(ex => {
+      const color = CAT_COLORS[ex.category] || 'transparent';
+      return `<li class="ex-select-item" data-id="${ex.id}" data-cat="${ex.category || ''}" data-name="${ex.name}" style="border-left-color:${color}">${ex.name}<span class="ex-select-cat">${ex.category || ''}</span></li>`;
+    }).join('');
+  const found = currentExerciseId && recordedExercises.find(ex => String(ex.id) === String(currentExerciseId));
+  if (found) { setExSelectLabel(found.name, CAT_COLORS[found.category] || ''); currentExerciseCategory = found.category || null; }
+  else { setExSelectLabel('— Select —', ''); currentExerciseId = null; currentExerciseCategory = null; }
 
   renderBodyWeightChart();
   renderFrequencyChart();
@@ -964,13 +979,13 @@ async function loadExerciseChart(exerciseId) {
 
   const { data: sets } = await sb
     .from('sets')
-    .select('weight, unit, session_id')
+    .select('weight, reps, duration, unit, session_id')
     .eq('exercise_id', exerciseId)
     .in('session_id', allSessions.map(s => s.id))
     .order('id', { ascending: true });
 
   currentExerciseSets = (sets || [])
-    .map(s => ({ date: sessionDateMap[s.session_id], weight: s.weight, unit: s.unit }))
+    .map(s => ({ date: sessionDateMap[s.session_id], weight: s.weight, reps: s.reps, duration: s.duration, unit: s.unit }))
     .filter(s => s.date)
     .sort((a, b) => a.date.localeCompare(b.date));
 
@@ -992,10 +1007,21 @@ function renderExerciseChart() {
   wrap.classList.remove('hidden');
   ph.classList.add('hidden');
 
+  const hasWeight   = filtered.some(s => s.weight > 0);
+  const hasDuration = filtered.some(s => s.duration > 0);
   const byDate = {};
-  filtered.forEach(s => { if (!byDate[s.date] || s.weight > byDate[s.date]) byDate[s.date] = s.weight; });
+  let yLabel;
+  if (hasWeight) {
+    filtered.forEach(s => { if (!byDate[s.date] || s.weight > byDate[s.date]) byDate[s.date] = s.weight || 0; });
+    yLabel = filtered[0]?.unit || 'kg';
+  } else if (hasDuration) {
+    filtered.forEach(s => { if (!byDate[s.date] || s.duration > byDate[s.date]) byDate[s.date] = s.duration || 0; });
+    yLabel = 'min';
+  } else {
+    filtered.forEach(s => { if (!byDate[s.date] || s.reps > byDate[s.date]) byDate[s.date] = s.reps || 0; });
+    yLabel = 'reps';
+  }
   const labels = Object.keys(byDate).sort();
-  const unit   = filtered[0]?.unit || 'kg';
 
   if (exChartInstance) exChartInstance.destroy();
   exChartInstance = new Chart(document.getElementById('ex-chart'), {
@@ -1008,7 +1034,7 @@ function renderExerciseChart() {
       ...chartDefaults.options,
       scales: {
         ...chartDefaults.options.scales,
-        y: { ticks: { font: { size: 11 } }, title: { display: true, text: unit, font: { size: 11 } } },
+        y: { ticks: { font: { size: 11 } }, title: { display: true, text: yLabel, font: { size: 11 } } },
       },
     },
   });
@@ -1018,17 +1044,26 @@ function renderStats() {
   document.getElementById('stat-sessions').textContent = allSessions.length || '—';
 
   if (currentExerciseSets.length) {
-    const max  = Math.max(...currentExerciseSets.map(s => s.weight));
-    const unit = currentExerciseSets[0].unit;
-    document.getElementById('stat-max-weight').textContent = `${max} ${unit}`;
+    const hasWeight   = currentExerciseSets.some(s => s.weight > 0);
+    const hasDuration = currentExerciseSets.some(s => s.duration > 0);
+    if (hasWeight) {
+      const max  = Math.max(...currentExerciseSets.map(s => s.weight || 0));
+      const unit = currentExerciseSets[0].unit || 'kg';
+      document.getElementById('stat-max-weight').textContent = `${max} ${unit}`;
+    } else if (hasDuration) {
+      const max = Math.max(...currentExerciseSets.map(s => s.duration || 0));
+      document.getElementById('stat-max-weight').textContent = `${max} min`;
+    } else {
+      const max = Math.max(...currentExerciseSets.map(s => s.reps || 0));
+      document.getElementById('stat-max-weight').textContent = `${max} reps`;
+    }
   } else {
     document.getElementById('stat-max-weight').textContent = '—';
   }
 
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 7);
-  const cutoffStr = cutoff.toISOString().split('T')[0];
-  const recent = allBodyWeights.filter(b => b.date >= cutoffStr);
+  const recent = filterByPeriod(allBodyWeights, 'date');
+  const periodLabel = { month: 'Avg (Mo)', year: 'Avg (Yr)', all: 'Avg (All)' }[currentPeriod];
+  document.getElementById('stat-avg-bw-label').textContent = periodLabel;
   if (recent.length) {
     const avg  = (recent.reduce((s, b) => s + b.weight, 0) / recent.length).toFixed(1);
     const unit = recent[0].unit;
@@ -1045,12 +1080,36 @@ document.querySelectorAll('.period-tab').forEach(btn => {
     currentPeriod = btn.dataset.period;
     renderBodyWeightChart();
     renderFrequencyChart();
+    renderStats();
     if (currentExerciseSets.length) renderExerciseChart();
   });
 });
 
-document.getElementById('exercise-select').addEventListener('change', e => {
-  const id = e.target.value;
+function setExSelectLabel(name, color) {
+  const label = document.getElementById('exercise-select-label');
+  label.textContent = name;
+  label.style.color = color || '';
+}
+
+document.getElementById('exercise-select-trigger').addEventListener('click', () => {
+  document.getElementById('exercise-select-list').classList.toggle('hidden');
+});
+
+document.addEventListener('click', e => {
+  if (!document.getElementById('exercise-select-wrap').contains(e.target)) {
+    document.getElementById('exercise-select-list').classList.add('hidden');
+  }
+});
+
+document.getElementById('exercise-select-list').addEventListener('click', e => {
+  const item = e.target.closest('.ex-select-item');
+  if (!item) return;
+  document.getElementById('exercise-select-list').classList.add('hidden');
+  const id    = item.dataset.id;
+  const color = item.style.borderLeftColor;
+  currentExerciseId       = id || null;
+  currentExerciseCategory = id ? (item.dataset.cat || null) : null;
+  setExSelectLabel(id ? (item.dataset.name || item.textContent) : item.textContent, id ? color : '');
   if (id) {
     loadExerciseChart(id);
   } else {

@@ -77,11 +77,46 @@
         </div>
 
         <div class="card">
-          <h2>Body Weight</h2>
+          <div class="card-title-row">
+            <h2>Body Weight</h2>
+            <div class="stat-chip">
+              <span class="stat-chip-value" id="stat-avg-bw">—</span>
+              <span class="stat-chip-label" id="stat-avg-bw-label">Avg</span>
+            </div>
+          </div>
           <div class="chart-wrap" id="bw-chart-wrap">
             <canvas id="bw-chart"></canvas>
           </div>
           <p id="bw-placeholder" class="placeholder hidden">No data yet.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title-row">
+            <h2>Exercise Progress</h2>
+            <div class="stat-chip">
+              <span class="stat-chip-value" id="stat-sessions">—</span>
+              <span class="stat-chip-label">Sessions</span>
+            </div>
+          </div>
+          <div class="ex-controls-row">
+            <div class="ex-select-wrap" id="exercise-select-wrap">
+              <button class="ex-select-trigger" id="exercise-select-trigger">
+                <span class="ex-select-label" id="exercise-select-label">— Select —</span>
+                <span class="ex-select-caret">▾</span>
+              </button>
+              <ul class="ex-select-list hidden" id="exercise-select-list"></ul>
+            </div>
+            <div class="stat-chip">
+              <span class="stat-chip-value" id="stat-max-weight">—</span>
+              <span class="stat-chip-label">Max</span>
+            </div>
+          </div>
+          <div class="ex-chart-area">
+            <div class="chart-wrap hidden" id="ex-chart-wrap">
+              <canvas id="ex-chart"></canvas>
+            </div>
+            <p id="ex-placeholder" class="placeholder">Select an exercise above.</p>
+          </div>
         </div>
 
         <div class="card">
@@ -90,33 +125,6 @@
             <canvas id="freq-chart"></canvas>
           </div>
           <p id="freq-placeholder" class="placeholder hidden">No data yet.</p>
-        </div>
-
-        <div class="card">
-          <h2>Exercise Progress</h2>
-          <select id="exercise-select" class="exercise-select"></select>
-          <div class="chart-wrap hidden" id="ex-chart-wrap">
-            <canvas id="ex-chart"></canvas>
-          </div>
-          <p id="ex-placeholder" class="placeholder">Select an exercise above.</p>
-        </div>
-
-        <div class="card">
-          <h2>Stats</h2>
-          <div class="stats-grid">
-            <div class="stat-item">
-              <div class="stat-value" id="stat-sessions">—</div>
-              <div class="stat-label">Total Sessions</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-value" id="stat-max-weight">—</div>
-              <div class="stat-label">Max Weight</div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-value" id="stat-avg-bw">—</div>
-              <div class="stat-label">Avg BW (7d)</div>
-            </div>
-          </div>
         </div>
       </div>
 
