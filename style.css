@@ -1316,6 +1316,8 @@ main {
 /* ── Exercise list ── */
 .exercise-list {
   list-style: none;
+  height: 200px;
+  overflow-y: auto;
   margin-bottom: 16px;
 }
 
@@ -1352,11 +1354,17 @@ main {
 .exercise-list li:hover { background: var(--bg); }
 
 /* ── Custom exercise form ── */
+.custom-exercise-section {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
 .custom-exercise-form {
   display: flex;
   gap: 8px;
-  padding-top: 12px;
-  border-top: 1px solid var(--border);
+  max-width: 50%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .custom-exercise-form input {
@@ -1477,7 +1485,7 @@ main {
   }
 
   #modal-exercise .modal-content {
-    width: 340px;
+    width: 560px;
     min-width: unset;
   }
 

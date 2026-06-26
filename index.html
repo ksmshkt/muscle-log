@@ -53,7 +53,6 @@
     <nav>
       <button class="active" data-tab="log">Log</button>
       <button data-tab="charts">Charts</button>
-      <button data-tab="data">Data</button>
     </nav>
 
     <main>
@@ -128,27 +127,6 @@
         </div>
       </div>
 
-      <div id="page-data" class="page">
-        <div class="card">
-          <h2>Export</h2>
-          <p class="placeholder">Download all your data as a JSON file.</p>
-          <button class="btn btn-primary" id="btn-export">Export JSON</button>
-        </div>
-        <div class="card">
-          <h2>Import</h2>
-          <p class="placeholder">Restore data from a previously exported JSON file.</p>
-          <label class="btn btn-outline" id="label-import">
-            Select JSON file
-            <input type="file" id="input-import" accept=".json" style="display:none" />
-          </label>
-          <p id="import-status" class="placeholder hidden"></p>
-        </div>
-        <div class="card">
-          <h2>Delete All Data</h2>
-          <p class="placeholder">Permanently delete all sessions, sets, and body weights.</p>
-          <button class="btn btn-danger" id="btn-delete-all">Delete All</button>
-        </div>
-      </div>
     </main>
 
     <!-- ── Log detail modal ── -->
@@ -202,9 +180,11 @@
         </div>
         <div class="category-tabs" id="category-tabs"></div>
         <ul class="exercise-list" id="exercise-list"></ul>
-        <div class="custom-exercise-form">
-          <input type="text" id="custom-exercise-input" placeholder="Custom exercise name" />
-          <button class="btn btn-primary" id="btn-save-custom">Add</button>
+        <div class="custom-exercise-section">
+          <div class="custom-exercise-form">
+            <input type="text" id="custom-exercise-input" placeholder="Custom exercise name" />
+            <button class="btn btn-primary" id="btn-save-custom">Add</button>
+          </div>
         </div>
       </div>
     </div>
