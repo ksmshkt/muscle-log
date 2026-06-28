@@ -1194,6 +1194,7 @@ document.getElementById('copy-date-input').addEventListener('change', e => execu
 document.getElementById('copy-date-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') executeCopy(e.target.value);
 });
+document.getElementById('btn-confirm-copy').addEventListener('click', () => executeCopy(document.getElementById('copy-date-input').value));
 
 // ── Delete log ──
 document.getElementById('btn-delete-log').addEventListener('click', async () => {

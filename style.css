@@ -730,6 +730,23 @@ main {
   min-width: 0;
 }
 
+.copy-date-confirm {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 6px;
+  line-height: 1;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+
+.copy-date-confirm:hover {
+  color: var(--accent);
+  background: var(--bg);
+}
+
 .copy-date-cancel {
   background: none;
   border: none;
