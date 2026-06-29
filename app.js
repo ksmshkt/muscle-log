@@ -505,7 +505,11 @@ async function loadDateRecord(date) {
     exerciseMap[ex.name].sets.push({ weight: set.weight, reps: set.reps, duration: set.duration });
   });
 
-  sessionExercises = exerciseOrder.map(n => exerciseMap[n]);
+  sessionExercises = exerciseOrder.map(n => exerciseMap[n]).sort((a, b) => {
+    const ao = CATEGORIES.indexOf(a.category); const bo = CATEGORIES.indexOf(b.category);
+    if (ao !== bo) return (ao === -1 ? 999 : ao) - (bo === -1 ? 999 : bo);
+    return exerciseOrder.indexOf(a.name) - exerciseOrder.indexOf(b.name);
+  });
 
   renderExerciseBlocks();
   updateSaveButton();
@@ -713,7 +717,11 @@ async function loadExercisesFromDate(sourceDate) {
     exerciseMap[ex.name].sets.push({ weight: set.weight, reps: set.reps, duration: set.duration });
   });
 
-  sessionExercises = exerciseOrder.map(n => exerciseMap[n]);
+  sessionExercises = exerciseOrder.map(n => exerciseMap[n]).sort((a, b) => {
+    const ao = CATEGORIES.indexOf(a.category); const bo = CATEGORIES.indexOf(b.category);
+    if (ao !== bo) return (ao === -1 ? 999 : ao) - (bo === -1 ? 999 : bo);
+    return exerciseOrder.indexOf(a.name) - exerciseOrder.indexOf(b.name);
+  });
   renderExerciseBlocks();
   updateSaveButton();
   return true;
