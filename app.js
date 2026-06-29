@@ -63,6 +63,10 @@ function closeLogModal() {
   sessionExercises = [];
   existingSessionIds = [];
   inputBodyWeight.value = '';
+  const d = new Date(logDateInput.value || today());
+  calendarYear  = d.getUTCFullYear();
+  calendarMonth = d.getUTCMonth();
+  renderCalendarGrid();
   renderExerciseBlocks();
   updateSaveButton();
 }
@@ -535,10 +539,6 @@ async function changeLogDate(newDate) {
   sessionExercises = [];
   existingSessionIds = [];
   inputBodyWeight.value = '';
-  const d = new Date(newDate);
-  calendarYear  = d.getUTCFullYear();
-  calendarMonth = d.getUTCMonth();
-  renderCalendarGrid();
   openLogModal(newDate);
   await loadDateRecord(newDate);
 }
