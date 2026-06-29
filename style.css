@@ -1239,7 +1239,7 @@ main {
 }
 
 #modal-log .modal-content {
-  height: calc(100dvh - 72px);
+  height: 62dvh;
   max-height: none;
 }
 
