@@ -1412,6 +1412,11 @@ main {
   to   { opacity: 1; transform: scale(1); }
 }
 
+/* Prevent iOS Safari auto-zoom on input focus */
+@media (max-width: 767px) {
+  input { font-size: 16px; }
+}
+
 @media (min-width: 768px) {
 
   /* Content area: 60% centered */
