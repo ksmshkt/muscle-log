@@ -1366,22 +1366,17 @@ main {
   flex-shrink: 0;
 }
 
-.exercise-list li:last-child { border-bottom: none; }
 
 .exercise-list li:hover { background: var(--bg); }
 
 /* ── Custom exercise form ── */
 .custom-exercise-section {
-  border-top: 1px solid var(--border);
   padding-top: 12px;
 }
 
 .custom-exercise-form {
   display: flex;
   gap: 8px;
-  max-width: 50%;
-  margin-left: auto;
-  margin-right: auto;
 }
 
 .custom-exercise-form input {
@@ -1504,6 +1499,12 @@ main {
   #modal-exercise .modal-content {
     width: 560px;
     min-width: unset;
+  }
+
+  .custom-exercise-form {
+    max-width: 50%;
+    margin-left: auto;
+    margin-right: auto;
   }
 
   /* Charts tab: compact layout so all cards fit without scrolling */
