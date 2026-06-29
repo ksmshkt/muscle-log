@@ -1156,6 +1156,25 @@ document.getElementById('modal-date-next').addEventListener('click', () => {
   changeLogDate(d.toISOString().split('T')[0]);
 });
 
+// ── Swipe to navigate dates ──
+let swipeStartX = 0;
+let swipeStartY = 0;
+
+document.getElementById('modal-log').addEventListener('touchstart', e => {
+  swipeStartX = e.touches[0].clientX;
+  swipeStartY = e.touches[0].clientY;
+}, { passive: true });
+
+document.getElementById('modal-log').addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - swipeStartX;
+  const dy = e.changedTouches[0].clientY - swipeStartY;
+  if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+  const d = new Date(logDateInput.value || today());
+  if (dx < 0) d.setUTCDate(d.getUTCDate() + 1);
+  else        d.setUTCDate(d.getUTCDate() - 1);
+  changeLogDate(d.toISOString().split('T')[0]);
+}, { passive: true });
+
 // ── Copy from date ──
 document.getElementById('btn-copy-from-date').addEventListener('click', () => {
   const row = document.getElementById('copy-date-row');
