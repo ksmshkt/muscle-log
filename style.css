@@ -322,12 +322,12 @@ main {
 
 .chart-wrap {
   position: relative;
-  height: 180px;
+  height: 140px;
 }
 
 .ex-chart-area {
   position: relative;
-  height: 180px;
+  height: 140px;
 }
 
 .ex-chart-area > .chart-wrap {
@@ -957,7 +957,7 @@ main {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 
 #cal-month-label {
@@ -997,8 +997,8 @@ main {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 6px 2px;
-  min-height: 54px;
+  padding: 4px 2px;
+  min-height: 44px;
   border-radius: 8px;
 }
 
