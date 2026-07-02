@@ -957,7 +957,7 @@ main {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 16px;
 }
 
 #cal-month-label {
@@ -998,7 +998,7 @@ main {
   flex-direction: column;
   align-items: center;
   padding: 6px 2px;
-  min-height: calc((100dvh - 195px) / 6);
+  min-height: 54px;
   border-radius: 8px;
 }
 
