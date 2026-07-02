@@ -1,4 +1,4 @@
-const CACHE = 'muscle-log-v2';
+const CACHE = 'muscle-log-v1';
 const STATIC = ['/', '/index.html', '/style.css', '/app.js'];
 
 self.addEventListener('install', e => {
