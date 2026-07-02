@@ -1148,6 +1148,24 @@ document.getElementById('cal-next').addEventListener('click', () => {
   renderCalendarGrid();
 });
 
+// ── Swipe calendar to navigate months ──
+let calSwipeStartX = 0;
+let calSwipeStartY = 0;
+
+document.querySelector('.log-calendar-section').addEventListener('touchstart', e => {
+  calSwipeStartX = e.touches[0].clientX;
+  calSwipeStartY = e.touches[0].clientY;
+}, { passive: true });
+
+document.querySelector('.log-calendar-section').addEventListener('touchend', e => {
+  const dx = e.changedTouches[0].clientX - calSwipeStartX;
+  const dy = e.changedTouches[0].clientY - calSwipeStartY;
+  if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+  if (dx < 0) { if (++calendarMonth > 11) { calendarMonth = 0; calendarYear++; } }
+  else        { if (--calendarMonth < 0)  { calendarMonth = 11; calendarYear--; } }
+  renderCalendarGrid();
+}, { passive: true });
+
 // ── Log modal ──
 document.getElementById('modal-log-close').addEventListener('click', closeLogModal);
 document.getElementById('modal-log-overlay').addEventListener('click', closeLogModal);
