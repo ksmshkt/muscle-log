@@ -1239,8 +1239,26 @@ main {
 }
 
 #modal-log .modal-content {
-  height: 62dvh;
+  height: 68dvh;
   max-height: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Keep header / body-weight+actions / add+save toolbar fixed; only the
+   exercise list below scrolls, so Save/Update stays reachable. */
+#modal-log .modal-content > .modal-header,
+#modal-log .modal-content > .modal-log-top,
+#modal-log .modal-content > .log-toolbar {
+  flex-shrink: 0;
+}
+
+#modal-log #exercise-blocks {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 @keyframes slideUp {
