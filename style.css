@@ -707,9 +707,8 @@ main {
 
 .log-bw-section {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
 }
 
 .bw-input-row {
@@ -1001,27 +1000,51 @@ main {
   margin-bottom: 16px;
 }
 
+.modal-top-spacer {
+  flex: 1 1 0;
+}
+
 .modal-bw-center {
-  flex: 1;
+  flex: 0 0 auto;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 8px;
 }
 
 .modal-side-actions {
   position: relative;
+  flex: 1 1 0;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex-shrink: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
-.btn-side-sm {
-  font-size: 11px;
-  padding: 5px 10px;
-  width: auto;
-  margin-top: 0;
+.icon-btn-sm {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: none;
+  color: var(--text-sub);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.icon-btn-sm:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.icon-btn-sm.danger {
+  color: var(--danger-d);
+  border-color: var(--danger);
+}
+
+.icon-btn-sm.danger:hover {
+  background: rgba(239, 68, 68, 0.08);
 }
 
 /* ── Calendar ── */
@@ -1628,8 +1651,7 @@ main {
   #modal-log .modal-content > .log-toolbar,
   #modal-log .modal-content > #copy-date-row,
   #modal-log .modal-content > #exercise-blocks {
-    max-width: 520px;
-    margin-left: auto;
-    margin-right: auto;
+    align-self: stretch;
+    width: 100%;
   }
 }

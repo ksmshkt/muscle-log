@@ -172,6 +172,7 @@
           <button class="modal-close" id="modal-log-close">✕</button>
         </div>
         <div class="modal-log-top">
+          <div class="modal-top-spacer" aria-hidden="true"></div>
           <div class="modal-bw-center">
             <div class="log-bw-section">
               <label for="input-body-weight">Body Weight</label>
@@ -182,13 +183,25 @@
             </div>
           </div>
           <div class="modal-side-actions">
-            <button class="btn btn-outline btn-side-sm" id="btn-copy-from-date">Copy</button>
+            <button class="icon-btn-sm" id="btn-copy-from-date" aria-label="Copy from date" title="Copy from date">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="9" y="9" width="11" height="11" rx="2"/>
+                <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>
+              </svg>
+            </button>
             <div id="copy-date-row" class="copy-date-row hidden">
               <input type="date" id="copy-date-input" />
               <button class="copy-date-confirm" id="btn-confirm-copy">✓</button>
               <button class="copy-date-cancel" id="btn-cancel-copy">✕</button>
             </div>
-            <button class="btn btn-danger btn-side-sm hidden" id="btn-delete-log">Delete</button>
+            <button class="icon-btn-sm danger hidden" id="btn-delete-log" aria-label="Delete this day" title="Delete this day">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 7h16"/>
+                <path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/>
+                <path d="M10 11v6M14 11v6"/>
+                <path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/>
+              </svg>
+            </button>
           </div>
         </div>
         <div class="log-toolbar">
