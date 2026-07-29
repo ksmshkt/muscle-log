@@ -100,6 +100,13 @@ body {
   margin-bottom: 6px;
 }
 
+.auth-unit-hint {
+  font-size: 12px;
+  color: var(--text-sub);
+  line-height: 1.4;
+  margin-top: 6px;
+}
+
 .form-group input {
   width: 100%;
   padding: 10px 12px;
@@ -207,6 +214,65 @@ header {
   color: var(--danger);
   border-color: var(--danger);
   box-shadow: 0 0 8px rgba(239, 68, 68, 0.2);
+}
+
+/* ── Account menu ── */
+.account-menu-wrap {
+  position: relative;
+}
+
+.account-icon-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  background: none;
+  color: var(--text-sub);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.account-icon-btn:hover {
+  color: var(--primary);
+  border-color: var(--primary);
+}
+
+.account-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 12px;
+  min-width: 160px;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.account-menu-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.account-menu-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-sub);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.account-menu .btn-signout {
+  width: 100%;
+  text-align: center;
 }
 
 /* ── Tab bar ── */
@@ -766,7 +832,8 @@ main {
 
 /* ── Unit toggle ── */
 .unit-toggle {
-  display: flex;
+  display: inline-flex;
+  width: fit-content;
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
@@ -786,6 +853,11 @@ main {
 .unit-btn.active {
   background: var(--primary);
   color: #fff;
+}
+
+.unit-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 /* ── Set list ── */

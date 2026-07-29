@@ -83,7 +83,17 @@ authModeTabs.forEach(tab => {
     authModeTabs.forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
     authSubmit.textContent = authMode === 'signin' ? 'Sign In' : 'Sign Up';
+    document.getElementById('auth-unit-group').classList.toggle('hidden', authMode !== 'signup');
     setError('');
+  });
+});
+
+// ── Sign-up unit selection ──
+let signupUnit = 'kg';
+document.querySelectorAll('#signup-unit-toggle .unit-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    signupUnit = btn.dataset.unit;
+    document.querySelectorAll('#signup-unit-toggle .unit-btn').forEach(b => b.classList.toggle('active', b.dataset.unit === signupUnit));
   });
 });
 
@@ -104,7 +114,14 @@ tabs.forEach(btn => {
 
 // ── Auth state ──
 sb.auth.onAuthStateChange((_event, session) => {
-  session ? showApp() : showAuth();
+  if (session) {
+    currentUnit = session.user.user_metadata?.unit || 'kg';
+    applyUnit();
+    syncAccountUnitToggle();
+    showApp();
+  } else {
+    showAuth();
+  }
 });
 
 // ── Email auth ──
@@ -118,7 +135,7 @@ authForm.addEventListener('submit', async e => {
 
   const { error } = authMode === 'signin'
     ? await sb.auth.signInWithPassword({ email, password })
-    : await sb.auth.signUp({ email, password });
+    : await sb.auth.signUp({ email, password, options: { data: { unit: signupUnit } } });
 
   authSubmit.disabled = false;
 
@@ -148,7 +165,7 @@ const CATEGORIES = Object.keys(PRESETS);
 let customExercises = [];
 let sessionExercises = [];
 let activeCategory = CATEGORIES[0];
-let currentUnit = localStorage.getItem('unit') || 'kg';
+let currentUnit = 'kg';
 let existingSessionIds = [];
 let calendarYear    = new Date().getFullYear();
 let calendarMonth   = new Date().getMonth();
@@ -442,25 +459,98 @@ function renderExerciseBlocks() {
 // STEP 5: Training recording
 // ════════════════════════════════════════
 
-// ── Unit toggle ──
+// ── Unit ──
+const LBS_PER_KG = 2.20462;
+
+function convertWeight(value, fromUnit, toUnit) {
+  if (value == null || !fromUnit || fromUnit === toUnit) return value;
+  const kg = fromUnit === 'lbs' ? value / LBS_PER_KG : value;
+  return Math.round((toUnit === 'lbs' ? kg * LBS_PER_KG : kg) * 10) / 10;
+}
+
 function applyUnit() {
-  document.querySelectorAll('.unit-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.unit === currentUnit);
-  });
   bodyWeightUnitLabel.textContent = currentUnit;
 }
 
-document.querySelectorAll('.unit-btn').forEach(btn => {
+function syncAccountUnitToggle() {
+  document.querySelectorAll('#account-unit-toggle .unit-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.unit === currentUnit);
+  });
+}
+
+// ── Account menu ──
+document.getElementById('account-menu-trigger').addEventListener('click', () => {
+  document.getElementById('account-menu').classList.toggle('hidden');
+});
+
+document.addEventListener('click', e => {
+  if (!document.getElementById('account-menu-wrap').contains(e.target)) {
+    document.getElementById('account-menu').classList.add('hidden');
+  }
+});
+
+document.querySelectorAll('#account-unit-toggle .unit-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    currentUnit = btn.dataset.unit;
-    localStorage.setItem('unit', currentUnit);
-    applyUnit();
-    if (sessionExercises.length) renderExerciseBlocks();
+    const target = btn.dataset.unit;
+    if (target === currentUnit) return;
+    changeAccountUnit(target);
   });
 });
 
-// Apply saved unit on load
-applyUnit();
+async function changeAccountUnit(newUnit) {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user || newUnit === currentUnit) return;
+
+  const toggleButtons = document.querySelectorAll('#account-unit-toggle .unit-btn');
+  toggleButtons.forEach(b => b.disabled = true);
+
+  try {
+    const { data: sessions } = await sb.from('sessions').select('id').eq('user_id', user.id);
+    const sessionIds = (sessions || []).map(s => s.id);
+
+    const [{ data: sets }, { data: bodyWeights }] = await Promise.all([
+      sessionIds.length
+        ? sb.from('sets').select('id, weight, unit').in('session_id', sessionIds)
+        : Promise.resolve({ data: [] }),
+      sb.from('body_weights').select('id, weight, unit').eq('user_id', user.id),
+    ]);
+
+    const setsToConvert = (sets || []).filter(s => s.weight != null && s.unit !== newUnit);
+    const bwToConvert    = (bodyWeights || []).filter(b => b.weight != null && b.unit !== newUnit);
+    const totalCount = setsToConvert.length + bwToConvert.length;
+
+    const msg = totalCount > 0
+      ? `Convert all your data (${totalCount} record${totalCount !== 1 ? 's' : ''}) to ${newUnit}?`
+      : `Switch unit to ${newUnit}?`;
+    if (!confirm(msg)) return;
+
+    await Promise.all([
+      ...setsToConvert.map(s =>
+        sb.from('sets').update({ weight: convertWeight(s.weight, s.unit, newUnit), unit: newUnit }).eq('id', s.id)
+      ),
+      ...bwToConvert.map(b =>
+        sb.from('body_weights').update({ weight: convertWeight(b.weight, b.unit, newUnit), unit: newUnit }).eq('id', b.id)
+      ),
+    ]);
+
+    const { error } = await sb.auth.updateUser({ data: { unit: newUnit } });
+    if (error) throw error;
+
+    currentUnit = newUnit;
+    applyUnit();
+    syncAccountUnitToggle();
+    document.getElementById('account-menu').classList.add('hidden');
+
+    if (document.getElementById('page-charts').classList.contains('active')) {
+      loadCharts();
+    }
+  } catch (err) {
+    console.error('changeAccountUnit:', err);
+    alert('Failed to update unit. Please try again.');
+  } finally {
+    toggleButtons.forEach(b => b.disabled = false);
+  }
+}
 
 // ── Load existing records for selected date ──
 async function loadDateRecord(date) {
@@ -878,19 +968,18 @@ function renderBodyWeightChart() {
   wrap.classList.remove('hidden');
   ph.classList.add('hidden');
 
-  const unit = filtered[filtered.length - 1]?.unit || 'kg';
   if (bwChartInstance) bwChartInstance.destroy();
   bwChartInstance = new Chart(document.getElementById('bw-chart'), {
     ...chartDefaults,
     data: {
       labels: filtered.map(d => d.date),
-      datasets: [{ data: filtered.map(d => d.weight), borderColor: CHART_COLOR, backgroundColor: CHART_BG, borderWidth: 2, pointRadius: 3, fill: true, tension: 0.3 }],
+      datasets: [{ data: filtered.map(d => convertWeight(d.weight, d.unit, currentUnit)), borderColor: CHART_COLOR, backgroundColor: CHART_BG, borderWidth: 2, pointRadius: 3, fill: true, tension: 0.3 }],
     },
     options: {
       ...chartDefaults.options,
       scales: {
         ...chartDefaults.options.scales,
-        y: { ticks: { font: { size: 11 } }, title: { display: true, text: unit, font: { size: 11 } } },
+        y: { ticks: { font: { size: 11 } }, title: { display: true, text: currentUnit, font: { size: 11 } } },
       },
     },
   });
@@ -1020,8 +1109,11 @@ function renderExerciseChart() {
   const byDate = {};
   let yLabel;
   if (hasWeight) {
-    filtered.forEach(s => { if (!byDate[s.date] || s.weight > byDate[s.date]) byDate[s.date] = s.weight || 0; });
-    yLabel = filtered[0]?.unit || 'kg';
+    filtered.forEach(s => {
+      const w = convertWeight(s.weight, s.unit, currentUnit) || 0;
+      if (!byDate[s.date] || w > byDate[s.date]) byDate[s.date] = w;
+    });
+    yLabel = currentUnit;
   } else if (hasDuration) {
     filtered.forEach(s => { if (!byDate[s.date] || s.duration > byDate[s.date]) byDate[s.date] = s.duration || 0; });
     yLabel = 'min';
@@ -1055,9 +1147,8 @@ function renderStats() {
     const hasWeight   = currentExerciseSets.some(s => s.weight > 0);
     const hasDuration = currentExerciseSets.some(s => s.duration > 0);
     if (hasWeight) {
-      const max  = Math.max(...currentExerciseSets.map(s => s.weight || 0));
-      const unit = currentExerciseSets[0].unit || 'kg';
-      document.getElementById('stat-max-weight').textContent = `${max} ${unit}`;
+      const max = Math.max(...currentExerciseSets.map(s => convertWeight(s.weight, s.unit, currentUnit) || 0));
+      document.getElementById('stat-max-weight').textContent = `${max} ${currentUnit}`;
     } else if (hasDuration) {
       const max = Math.max(...currentExerciseSets.map(s => s.duration || 0));
       document.getElementById('stat-max-weight').textContent = `${max} min`;
@@ -1073,9 +1164,8 @@ function renderStats() {
   const periodLabel = { month: 'Avg (Mo)', year: 'Avg (Yr)', all: 'Avg (All)' }[currentPeriod];
   document.getElementById('stat-avg-bw-label').textContent = periodLabel;
   if (recent.length) {
-    const avg  = (recent.reduce((s, b) => s + b.weight, 0) / recent.length).toFixed(1);
-    const unit = recent[0].unit;
-    document.getElementById('stat-avg-bw').textContent = `${avg} ${unit}`;
+    const avg = (recent.reduce((s, b) => s + convertWeight(b.weight, b.unit, currentUnit), 0) / recent.length).toFixed(1);
+    document.getElementById('stat-avg-bw').textContent = `${avg} ${currentUnit}`;
   } else {
     document.getElementById('stat-avg-bw').textContent = '—';
   }
