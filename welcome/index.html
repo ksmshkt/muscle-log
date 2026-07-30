@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>muscle-log — 記録は、3タップで終わる。</title>
+<meta name="description" content="フレームワーク無し・広告無しのシンプルな筋トレ記録アプリ" />
+<style>
+  :root {
+    --bg: #eef2f6;
+    --surface: #ffffff;
+    --border: #dde4ec;
+    --ink: #16202e;
+    --ink-soft: #5b6b7d;
+    --accent: #3ea8ff;
+    --accent-deep: #1565c0;
+    --accent-tint: rgba(62, 168, 255, 0.1);
+
+    --chest: #ef4444;
+    --back: #22c55e;
+    --legs: #8b5cf6;
+    --shoulders: #f97316;
+    --arms: #ec4899;
+    --core: #eab308;
+    --cardio: #06b6d4;
+
+    --shadow-sm: 0 2px 8px rgba(22, 32, 46, 0.06);
+    --shadow-md: 0 12px 32px rgba(22, 32, 46, 0.12);
+    --shadow-lg: 0 24px 64px rgba(22, 32, 46, 0.18);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f151c;
+      --surface: #161e27;
+      --border: #263140;
+      --ink: #eef2f6;
+      --ink-soft: #94a4b6;
+      --accent: #5fb8ff;
+      --accent-deep: #8fd0ff;
+      --accent-tint: rgba(95, 184, 255, 0.14);
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.5);
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Segoe UI", sans-serif;
+    line-height: 1.7;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  a { color: inherit; }
+
+  /* ── Nav ── */
+  nav.top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 22px 0;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+
+  .brand svg { color: var(--accent); flex-shrink: 0; }
+
+  .nav-link {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink-soft);
+    text-decoration: none;
+    padding: 8px 14px;
+    border-radius: 20px;
+    border: 1.5px solid var(--border);
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .nav-link:hover { border-color: var(--accent); color: var(--accent-deep); }
+
+  /* ── Hero ── */
+  .hero {
+    padding: 64px 0 96px;
+    display: grid;
+    grid-template-columns: 1.05fr 0.95fr;
+    gap: 56px;
+    align-items: center;
+  }
+
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent-deep);
+    background: var(--accent-tint);
+    padding: 6px 14px;
+    border-radius: 20px;
+    margin-bottom: 22px;
+  }
+
+  h1 {
+    font-size: clamp(34px, 5vw, 52px);
+    font-weight: 900;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    margin: 0 0 20px;
+    text-wrap: balance;
+  }
+
+  h1 em {
+    font-style: normal;
+    color: var(--accent-deep);
+  }
+
+  .hero-sub {
+    font-size: 16.5px;
+    color: var(--ink-soft);
+    max-width: 46ch;
+    margin: 0 0 32px;
+  }
+
+  .cta-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .cta-note {
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    margin: 14px 0 0;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14.5px;
+    font-weight: 700;
+    padding: 13px 24px;
+    border-radius: 28px;
+    text-decoration: none;
+    transition: transform 0.15s, box-shadow 0.15s, background 0.15s;
+  }
+
+  .btn-primary {
+    background: linear-gradient(160deg, #63bdff, var(--accent-deep));
+    color: #fff;
+    box-shadow: var(--shadow-md);
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+
+  .btn-ghost {
+    background: var(--surface);
+    color: var(--ink);
+    border: 1.5px solid var(--border);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent-deep); }
+
+  /* ── Hero visual: mock UI ── */
+  .hero-visual {
+    position: relative;
+    height: 420px;
+  }
+
+  .mock-card {
+    position: absolute;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .mock-cal {
+    width: 320px;
+    padding: 20px;
+    top: 0;
+    left: 10px;
+    transform: rotate(-3deg);
+  }
+
+  .mock-cal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 14px;
+    color: var(--ink);
+  }
+
+  .mock-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 6px;
+  }
+
+  .mock-cal-grid span {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: var(--ink-soft);
+    border-radius: 8px;
+    position: relative;
+  }
+
+  .mock-cal-grid span.has-log { font-weight: 700; color: var(--ink); background: var(--accent-tint); }
+  .mock-cal-grid span.has-log::after {
+    content: "";
+    position: absolute;
+    bottom: 4px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .mock-cal-grid span.today { outline: 2px solid var(--accent); }
+
+  .mock-log {
+    width: 270px;
+    padding: 18px;
+    bottom: 12px;
+    right: 0;
+    transform: rotate(2.5deg);
+  }
+
+  .mock-log-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    margin-bottom: 12px;
+  }
+
+  .mock-ex {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--cat, var(--accent));
+    border-radius: 10px;
+    margin-bottom: 8px;
+    font-size: 12.5px;
+  }
+
+  .mock-ex b { display: block; font-size: 13.5px; margin-bottom: 1px; }
+  .mock-ex span { color: var(--ink-soft); font-size: 11.5px; }
+  .mock-ex em { font-style: normal; color: var(--accent-deep); font-weight: 700; }
+
+  /* ── Sections shared ── */
+  section { padding: 72px 0; }
+
+  .section-head { max-width: 620px; margin: 0 auto 40px; text-align: center; }
+  .section-head .eyebrow { display: inline-flex; }
+  .section-head h2 {
+    font-size: clamp(24px, 3.4vw, 32px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin: 0 0 12px;
+    text-wrap: balance;
+  }
+  .section-head p { color: var(--ink-soft); font-size: 15px; margin: 0; }
+
+  /* ── Trust strip ── */
+  .trust-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+
+  .trust-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 26px 24px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .trust-card .icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: var(--accent-tint);
+    color: var(--accent-deep);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+
+  .trust-card h3 { font-size: 16px; font-weight: 700; margin: 0 0 8px; letter-spacing: -0.01em; }
+  .trust-card p { font-size: 13.5px; color: var(--ink-soft); margin: 0; }
+
+  .trust-card.highlight {
+    border-color: var(--accent);
+    box-shadow: var(--shadow-md);
+    transform: scale(1.04);
+  }
+  .trust-card.highlight .icon { background: var(--accent); color: #fff; }
+  .trust-card.highlight h3 { color: var(--accent-deep); }
+
+  /* ── Feature grid ── */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .feature-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--cat);
+    border-radius: 12px;
+    padding: 20px 22px;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .feature-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+
+  .feature-card .tag {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--cat);
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  .feature-card h3 { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
+  .feature-card p { font-size: 13px; color: var(--ink-soft); margin: 0; line-height: 1.55; }
+
+  /* ── Build note ── */
+  .build-note {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 40px;
+    display: flex;
+    gap: 32px;
+    align-items: center;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .build-note .stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .stack-chip {
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 14px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--ink-soft);
+  }
+
+  .build-note h3 { font-size: 18px; font-weight: 800; margin: 0 0 8px; letter-spacing: -0.01em; }
+  .build-note p { font-size: 13.5px; color: var(--ink-soft); margin: 0; max-width: 60ch; }
+
+  /* ── Final CTA ── */
+  .final-cta {
+    text-align: center;
+    padding: 88px 0 64px;
+  }
+
+  .final-cta h2 {
+    font-size: clamp(26px, 4vw, 38px);
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    margin: 0 0 16px;
+    text-wrap: balance;
+  }
+
+  .final-cta p { color: var(--ink-soft); font-size: 15px; margin: 0 0 28px; }
+
+  .demo-box {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12.5px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 20px;
+    margin-bottom: 28px;
+    color: var(--ink-soft);
+  }
+  .demo-box b { color: var(--ink); font-family: inherit; }
+
+  footer {
+    text-align: center;
+    padding: 32px 0 48px;
+    font-size: 12.5px;
+    color: var(--ink-soft);
+  }
+
+  /* ── Reveal on scroll ── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(18px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  .reveal.in { opacity: 1; transform: none; }
+
+  /* ── Responsive ── */
+  @media (max-width: 860px) {
+    .hero { grid-template-columns: 1fr; padding-top: 32px; }
+    .hero-visual { height: 340px; order: -1; }
+    .mock-cal { width: 78%; left: 0; }
+    .mock-log { width: 62%; }
+    .trust-grid, .feature-grid { grid-template-columns: 1fr; }
+    .build-note { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <nav class="top">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="2" y="10" width="3" height="4" rx="1"/>
+        <rect x="19" y="10" width="3" height="4" rx="1"/>
+        <rect x="5" y="11.5" width="3" height="1" rx="0.5"/>
+        <rect x="16" y="11.5" width="3" height="1" rx="0.5"/>
+        <rect x="8" y="8" width="8" height="8" rx="1"/>
+      </svg>
+      muscle-log
+    </div>
+    <a class="nav-link" href="https://github.com/ksmshkt/muscle-log" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+</div>
+
+<div class="wrap">
+  <section class="hero" style="padding-top:8px;">
+    <div>
+      <span class="eyebrow">Solo-built · No Ads · Open Source</span>
+      <h1>記録は、<em>3タップ</em>で終わる。</h1>
+      <p class="hero-sub">
+        カレンダーをタップ、種目を選ぶ、重さと回数を入れる。それだけです。
+        シンプルな筋トレ記録アプリ。
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="https://muscle-log-lilac.vercel.app/" target="_blank" rel="noopener">
+          使ってみる →
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/ksmshkt/muscle-log" target="_blank" rel="noopener">
+          コードを見る
+        </a>
+      </div>
+      <p class="cta-note">※ デモアカウントでも試しに利用可能</p>
+    </div>
+
+    <div class="hero-visual">
+      <div class="mock-card mock-cal">
+        <div class="mock-cal-head">
+          <span>‹</span><span>July 2026</span><span>›</span>
+        </div>
+        <div class="mock-cal-grid">
+          <span style="color:var(--ink-soft);font-weight:700;">Mo</span>
+          <span style="color:var(--ink-soft);font-weight:700;">Tu</span>
+          <span style="color:var(--ink-soft);font-weight:700;">We</span>
+          <span style="color:var(--ink-soft);font-weight:700;">Th</span>
+          <span style="color:var(--ink-soft);font-weight:700;">Fr</span>
+          <span style="color:var(--ink-soft);font-weight:700;">Sa</span>
+          <span style="color:var(--ink-soft);font-weight:700;">Su</span>
+          <span></span><span></span><span class="has-log">1</span><span>2</span><span class="has-log">3</span><span>4</span><span>5</span>
+          <span class="has-log">6</span><span>7</span><span class="has-log">8</span><span>9</span><span class="has-log today">10</span><span>11</span><span>12</span>
+          <span class="has-log">13</span><span>14</span><span class="has-log">15</span><span>16</span><span>17</span><span>18</span><span>19</span>
+        </div>
+      </div>
+      <div class="mock-card mock-log">
+        <div class="mock-log-title">Wed, July 10</div>
+        <div class="mock-ex" style="--cat:var(--chest)">
+          <div><b>Bench Press</b><span>Chest</span></div>
+          <em>60kg×8</em>
+        </div>
+        <div class="mock-ex" style="--cat:var(--back)">
+          <div><b>Lat Pulldown</b><span>Back</span></div>
+          <em>45kg×10</em>
+        </div>
+        <div class="mock-ex" style="--cat:var(--legs)">
+          <div><b>Squat</b><span>Legs</span></div>
+          <em>80kg×6</em>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="wrap">
+  <section class="reveal">
+    <div class="section-head">
+      <span class="eyebrow">なぜ作ったか</span>
+      <h2>自分が使いたいものを、自分のために作った。</h2>
+      <p>見やすくて、記録が簡単。かゆいところに手が届く筋トレ記録アプリが欲しかった。それだけです。</p>
+    </div>
+    <div class="trust-grid">
+      <div class="trust-card">
+        <div class="icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18"/><circle cx="8" cy="14" r="1"/><circle cx="12" cy="14" r="1"/></svg>
+        </div>
+        <h3>見やすい</h3>
+        <p>カレンダーで記録がある日がひと目でわかる。体重やトレーニングの推移もグラフで直感的に。</p>
+      </div>
+      <div class="trust-card highlight">
+        <div class="icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+        <h3>記録が簡単</h3>
+        <p>前回の重さ・回数がプレースホルダーで最初から見えてる。前回と同じ日は、日付をまるごと1タップでコピーもできる。</p>
+      </div>
+      <div class="trust-card">
+        <div class="icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+        </div>
+        <h3>自分用のちょうどよさ</h3>
+        <p>通知もSNS連携も無い。必要な機能だけを、必要な分だけ入れています。</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="wrap">
+  <section class="reveal">
+    <div class="section-head">
+      <span class="eyebrow">できること</span>
+      <h2>必要なものだけ、ちゃんと入ってる。</h2>
+    </div>
+    <div class="feature-grid">
+      <div class="feature-card" style="--cat:var(--chest)">
+        <span class="tag">Log</span>
+        <h3>カレンダーで記録管理</h3>
+        <p>日付をタップして開くだけ。その日の記録がひと目でわかる。</p>
+      </div>
+      <div class="feature-card" style="--cat:var(--back)">
+        <span class="tag">Log</span>
+        <h3>前回の記録をプレースホルダー表示</h3>
+        <p>同じ種目を選ぶと、前回の重さ・回数が薄く表示される。ゼロから入力し直さなくていい。</p>
+      </div>
+      <div class="feature-card" style="--cat:var(--legs)">
+        <span class="tag">Log</span>
+        <h3>日付ごとコピー</h3>
+        <p>前回と同じメニューの日は、1タップで丸ごと複製。</p>
+      </div>
+      <div class="feature-card" style="--cat:var(--shoulders)">
+        <span class="tag">Charts</span>
+        <h3>体重トレンド・種目別グラフ</h3>
+        <p>体重の推移、種目ごとの最大重量、週あたりの頻度をグラフで確認。</p>
+      </div>
+      <div class="feature-card" style="--cat:var(--arms)">
+        <span class="tag">Anywhere</span>
+        <h3>ホーム画面に追加できるPWA</h3>
+        <p>アプリストア不要。ブラウザから「ホーム画面に追加」するだけでアプリのように使える。</p>
+      </div>
+      <div class="feature-card" style="--cat:var(--cardio)">
+        <span class="tag">Log</span>
+        <h3>種目タイプに応じた入力</h3>
+        <p>筋トレは重さ×回数、有酸素は時間、腹筋系は回数のみ。種目に合わせて入力欄が変わる。</p>
+      </div>
+      <div class="feature-card" style="--cat:var(--accent)">
+        <span class="tag">Data</span>
+        <h3>いつでもCSVで書き出せる</h3>
+        <p>記録は全部ダウンロード可能。サービスが終わっても、自分のトレーニング履歴は手元に残る。</p>
+      </div>
+      <div class="feature-card" style="--cat:var(--accent)">
+        <span class="tag">Data</span>
+        <h3>いつでも全データ削除できる</h3>
+        <p>アカウントメニューからワンタップで全データ削除。体重やトレーニング履歴を人質に取られない。</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="wrap">
+  <section class="reveal">
+    <div class="build-note">
+      <div>
+        <h3>個人開発、ビルドステップなし。</h3>
+        <p>フレームワークを使わず、素のJavaScript一枚で書いています。認証とDBはSupabase、グラフはChart.js。広告も、行動トラッキングも入っていません。</p>
+        <div class="stack">
+          <span class="stack-chip">Vanilla JS</span>
+          <span class="stack-chip">HTML / CSS</span>
+          <span class="stack-chip">Supabase</span>
+          <span class="stack-chip">Chart.js</span>
+          <span class="stack-chip">Vercel</span>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="wrap">
+  <section class="final-cta reveal">
+    <h2>とりあえず、触ってみてください。</h2>
+    <p>サインアップ不要、下のデモアカウントですぐ試せます。もちろん自分のアカウントを作ってもOK。</p>
+    <div class="demo-box">
+      <span>email &nbsp;<b>demo@muscle-log.app</b></span>
+      <span>pass &nbsp;&nbsp;<b>Demo1234!</b></span>
+    </div>
+    <div class="cta-row" style="justify-content:center">
+      <a class="btn btn-primary" href="https://muscle-log-lilac.vercel.app/" target="_blank" rel="noopener">使ってみる →</a>
+    </div>
+  </section>
+  <footer>muscle-log — a minimal workout logger. Built by @ksmshkt.</footer>
+</div>
+
+<script>
+  var els = document.querySelectorAll('.reveal');
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      });
+    }, { threshold: 0.15 });
+    els.forEach(function (el) { io.observe(el); });
+  } else {
+    els.forEach(function (el) { el.classList.add('in'); });
+  }
+</script>
+
+</body>
+</html>
