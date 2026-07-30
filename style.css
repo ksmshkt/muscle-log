@@ -352,8 +352,14 @@ main {
 /* ── Charts ── */
 .period-tabs {
   display: flex;
+  align-items: center;
   gap: 8px;
   margin-bottom: 16px;
+}
+
+.btn-export {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .period-tab {
@@ -1045,6 +1051,12 @@ main {
 
 .icon-btn-sm.danger:hover {
   background: rgba(239, 68, 68, 0.08);
+}
+
+.icon-btn-sm:disabled {
+  opacity: 0.5;
+  cursor: default;
+  pointer-events: none;
 }
 
 /* ── Calendar ── */

@@ -1339,3 +1339,117 @@ document.getElementById('btn-delete-log').addEventListener('click', async () => 
   closeLogModal();
   await deleteHistoryByDate(date, ids);
 });
+
+// ── Data Export ──
+const EXPORT_HEADERS = ['date', 'type', 'exercise_name', 'category', 'set_number', 'weight', 'reps', 'duration', 'unit'];
+
+function csvEscape(value) {
+  if (value == null) return '';
+  const s = String(value);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function rowsToCsv(rows) {
+  const lines = [EXPORT_HEADERS.join(',')];
+  rows.forEach(row => {
+    lines.push(EXPORT_HEADERS.map(h => csvEscape(row[h])).join(','));
+  });
+  return lines.join('\r\n');
+}
+
+function buildExportRows({ sessions, exercises, sets, bodyWeights }) {
+  const sessionDateById = Object.fromEntries(sessions.map(s => [s.id, s.date]));
+  const exerciseById = Object.fromEntries(exercises.map(e => [e.id, e]));
+  const setNumberCounters = {};
+
+  const setRows = sets
+    .map(s => {
+      const date = sessionDateById[s.session_id];
+      const ex = exerciseById[s.exercise_id];
+      if (!date || !ex) return null;
+      const key = `${date}|${s.exercise_id}`;
+      setNumberCounters[key] = (setNumberCounters[key] || 0) + 1;
+      return {
+        date,
+        type: 'set',
+        exercise_name: ex.name,
+        category: ex.category,
+        set_number: setNumberCounters[key],
+        weight: s.weight,
+        reps: s.reps,
+        duration: s.duration,
+        unit: s.unit,
+      };
+    })
+    .filter(Boolean);
+
+  const bwRows = bodyWeights.map(b => ({
+    date: b.date,
+    type: 'body_weight',
+    exercise_name: '',
+    category: '',
+    set_number: '',
+    weight: b.weight,
+    reps: '',
+    duration: '',
+    unit: b.unit,
+  }));
+
+  return [...setRows, ...bwRows].sort((a, b) =>
+    a.date !== b.date ? a.date.localeCompare(b.date)
+    : a.type !== b.type ? a.type.localeCompare(b.type)
+    : a.exercise_name !== b.exercise_name ? a.exercise_name.localeCompare(b.exercise_name)
+    : (a.set_number || 0) - (b.set_number || 0)
+  );
+}
+
+function downloadTextFile(filename, text, mime = 'text/csv;charset=utf-8;') {
+  const blob = new Blob(['﻿' + text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+async function exportUserData() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+
+  const btn = document.getElementById('btn-export-data');
+  btn.disabled = true;
+
+  try {
+    const [{ data: sessionsRaw }, { data: exercises }, { data: bodyWeightsRaw }] = await Promise.all([
+      sb.from('sessions').select('id, date').eq('user_id', user.id),
+      sb.from('exercises').select('id, name, category').eq('user_id', user.id),
+      sb.from('body_weights').select('date, weight, unit').eq('user_id', user.id).order('date', { ascending: true }),
+    ]);
+
+    const sessions = filterByPeriod(sessionsRaw || [], 'date');
+    const bodyWeights = filterByPeriod(bodyWeightsRaw || [], 'date');
+    const sessionIds = sessions.map(s => s.id);
+
+    const { data: sets } = sessionIds.length
+      ? await sb.from('sets').select('session_id, exercise_id, weight, reps, duration, unit').in('session_id', sessionIds).order('id', { ascending: true })
+      : { data: [] };
+
+    const rows = buildExportRows({ sessions, exercises: exercises || [], sets: sets || [], bodyWeights });
+    if (!rows.length) {
+      alert('No data to export for the selected period.');
+      return;
+    }
+
+    downloadTextFile(`muscle-log-export-${currentPeriod}-${today()}.csv`, rowsToCsv(rows));
+  } catch (err) {
+    console.error('exportUserData:', err);
+    alert('Export failed. Please try again.');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('btn-export-data').addEventListener('click', exportUserData);
