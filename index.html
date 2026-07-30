@@ -20,32 +20,64 @@
     <div class="auth-card">
       <div class="auth-logo">muscle-log</div>
 
-      <div class="auth-mode-tabs">
-        <button class="auth-mode-tab active" data-mode="signin">Sign In</button>
-        <button class="auth-mode-tab" data-mode="signup">Sign Up</button>
+      <div id="auth-main-view">
+        <div class="auth-mode-tabs">
+          <button class="auth-mode-tab active" data-mode="signin">Sign In</button>
+          <button class="auth-mode-tab" data-mode="signup">Sign Up</button>
+        </div>
+
+        <form id="auth-form" novalidate>
+          <div class="form-group">
+            <label for="auth-email">Email</label>
+            <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email" />
+          </div>
+          <div class="form-group">
+            <label for="auth-password">Password</label>
+            <input type="password" id="auth-password" placeholder="••••••••" autocomplete="current-password" />
+          </div>
+          <div class="form-group hidden" id="auth-unit-group">
+            <label>Unit</label>
+            <div class="unit-toggle" id="signup-unit-toggle">
+              <button type="button" class="unit-btn active" data-unit="kg">kg</button>
+              <button type="button" class="unit-btn" data-unit="lbs">lbs</button>
+            </div>
+            <p class="auth-unit-hint">Used for all your workout & body weight logs. Can be changed later from the account menu.</p>
+          </div>
+          <button type="button" class="link-btn" id="btn-forgot-password">Forgot password?</button>
+          <p id="auth-error" class="auth-error hidden"></p>
+          <button type="submit" class="btn btn-primary" id="auth-submit">Sign In</button>
+        </form>
       </div>
 
-      <form id="auth-form" novalidate>
-        <div class="form-group">
-          <label for="auth-email">Email</label>
-          <input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email" />
-        </div>
-        <div class="form-group">
-          <label for="auth-password">Password</label>
-          <input type="password" id="auth-password" placeholder="••••••••" autocomplete="current-password" />
-        </div>
-        <div class="form-group hidden" id="auth-unit-group">
-          <label>Unit</label>
-          <div class="unit-toggle" id="signup-unit-toggle">
-            <button type="button" class="unit-btn active" data-unit="kg">kg</button>
-            <button type="button" class="unit-btn" data-unit="lbs">lbs</button>
+      <div id="auth-forgot-view" class="hidden">
+        <p class="auth-forgot-desc">Enter your email and we'll send you a link to reset your password.</p>
+        <form id="forgot-form" novalidate>
+          <div class="form-group">
+            <label for="forgot-email">Email</label>
+            <input type="email" id="forgot-email" placeholder="you@example.com" autocomplete="email" />
           </div>
-          <p class="auth-unit-hint">Used for all your workout & body weight logs. Can be changed later from the account menu.</p>
-        </div>
-        <p id="auth-error" class="auth-error hidden"></p>
-        <button type="submit" class="btn btn-primary" id="auth-submit">Sign In</button>
-      </form>
+          <p id="forgot-error" class="auth-error hidden"></p>
+          <button type="submit" class="btn btn-primary" id="forgot-submit">Send Reset Link</button>
+        </form>
+        <button type="button" class="link-btn" id="btn-back-to-signin">Back to Sign In</button>
+      </div>
 
+    </div>
+  </div>
+
+  <!-- ── Reset Password Screen ── -->
+  <div id="reset-password-screen" class="hidden">
+    <div class="auth-card">
+      <div class="auth-logo">muscle-log</div>
+      <p class="auth-forgot-desc">Enter a new password for your account.</p>
+      <form id="reset-password-form" novalidate>
+        <div class="form-group">
+          <label for="reset-password-input">New Password</label>
+          <input type="password" id="reset-password-input" placeholder="••••••••" autocomplete="new-password" />
+        </div>
+        <p id="reset-password-error" class="auth-error hidden"></p>
+        <button type="submit" class="btn btn-primary" id="reset-password-submit">Set New Password</button>
+      </form>
     </div>
   </div>
 

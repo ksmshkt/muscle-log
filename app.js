@@ -16,12 +16,28 @@ const authSubmit   = document.getElementById('auth-submit');
 const btnSignout   = document.getElementById('btn-signout');
 const authModeTabs = document.querySelectorAll('.auth-mode-tab');
 
+const authMainView       = document.getElementById('auth-main-view');
+const authForgotView     = document.getElementById('auth-forgot-view');
+const btnForgotPassword  = document.getElementById('btn-forgot-password');
+const btnBackToSignin    = document.getElementById('btn-back-to-signin');
+const forgotForm         = document.getElementById('forgot-form');
+const forgotEmail        = document.getElementById('forgot-email');
+const forgotError        = document.getElementById('forgot-error');
+const forgotSubmit       = document.getElementById('forgot-submit');
+
+const resetPasswordScreen = document.getElementById('reset-password-screen');
+const resetPasswordForm   = document.getElementById('reset-password-form');
+const resetPasswordInput  = document.getElementById('reset-password-input');
+const resetPasswordError  = document.getElementById('reset-password-error');
+const resetPasswordSubmit = document.getElementById('reset-password-submit');
+
 let authMode = 'signin';
 
 // ── Helpers ──
 function showAuth() {
   authScreen.classList.remove('hidden');
   app.classList.add('hidden');
+  resetPasswordScreen.classList.add('hidden');
   document.getElementById('modal-log').classList.add('hidden');
   sessionExercises = [];
   inputBodyWeight.value = '';
@@ -38,6 +54,7 @@ function formatDateLabel(dateStr) {
 
 function showApp() {
   authScreen.classList.add('hidden');
+  resetPasswordScreen.classList.add('hidden');
   app.classList.remove('hidden');
   const t = today();
   logDateInput.value = t;
@@ -84,8 +101,41 @@ authModeTabs.forEach(tab => {
     tab.classList.add('active');
     authSubmit.textContent = authMode === 'signin' ? 'Sign In' : 'Sign Up';
     document.getElementById('auth-unit-group').classList.toggle('hidden', authMode !== 'signup');
+    btnForgotPassword.classList.toggle('hidden', authMode !== 'signin');
     setError('');
   });
+});
+
+// ── Forgot password ──
+function setForgotError(msg) {
+  forgotError.textContent = msg;
+  forgotError.classList.toggle('hidden', !msg);
+}
+
+btnForgotPassword.addEventListener('click', () => {
+  forgotEmail.value = authEmail.value.trim();
+  setForgotError('');
+  authMainView.classList.add('hidden');
+  authForgotView.classList.remove('hidden');
+});
+
+btnBackToSignin.addEventListener('click', () => {
+  authForgotView.classList.add('hidden');
+  authMainView.classList.remove('hidden');
+});
+
+forgotForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  setForgotError('');
+  forgotSubmit.disabled = true;
+
+  const email = forgotEmail.value.trim();
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + window.location.pathname,
+  });
+
+  forgotSubmit.disabled = false;
+  setForgotError(error ? error.message : 'Check your email for a reset link.');
 });
 
 // ── Sign-up unit selection ──
@@ -114,6 +164,12 @@ tabs.forEach(btn => {
 
 // ── Auth state ──
 sb.auth.onAuthStateChange((_event, session) => {
+  if (_event === 'PASSWORD_RECOVERY') {
+    authScreen.classList.add('hidden');
+    app.classList.add('hidden');
+    resetPasswordScreen.classList.remove('hidden');
+    return;
+  }
   if (session) {
     currentUnit = session.user.user_metadata?.unit || 'kg';
     applyUnit();
@@ -122,6 +178,35 @@ sb.auth.onAuthStateChange((_event, session) => {
   } else {
     showAuth();
   }
+});
+
+// ── Set new password (after recovery link) ──
+function setResetPasswordError(msg) {
+  resetPasswordError.textContent = msg;
+  resetPasswordError.classList.toggle('hidden', !msg);
+}
+
+resetPasswordForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  setResetPasswordError('');
+  resetPasswordSubmit.disabled = true;
+
+  const { error } = await sb.auth.updateUser({ password: resetPasswordInput.value });
+
+  resetPasswordSubmit.disabled = false;
+
+  if (error) {
+    setResetPasswordError(error.message);
+    return;
+  }
+
+  resetPasswordInput.value = '';
+  alert('Password updated.');
+  const { data: { user } } = await sb.auth.getUser();
+  currentUnit = user.user_metadata?.unit || 'kg';
+  applyUnit();
+  syncAccountUnitToggle();
+  showApp();
 });
 
 // ── Email auth ──

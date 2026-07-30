@@ -36,13 +36,38 @@ body {
 .hidden { display: none !important; }
 
 /* ── Auth Screen ── */
-#auth-screen {
+#auth-screen,
+#reset-password-screen {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px 20px;
   min-height: 100dvh;
+}
+
+.auth-forgot-desc {
+  font-size: 13px;
+  color: var(--text-sub);
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.link-btn {
+  display: block;
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin: -8px 0 16px;
+  text-align: left;
+}
+
+.link-btn:hover {
+  text-decoration: underline;
 }
 
 .auth-card {
