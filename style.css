@@ -82,6 +82,20 @@ body {
   text-decoration: underline;
 }
 
+.danger-link {
+  color: var(--danger-d);
+  font-size: 12px;
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.danger-link:disabled {
+  opacity: 0.5;
+  cursor: default;
+  pointer-events: none;
+}
+
 .auth-card {
   background: var(--surface);
   border: 1px solid var(--border);

@@ -637,6 +637,47 @@ async function changeAccountUnit(newUnit) {
   }
 }
 
+document.getElementById('btn-delete-account').addEventListener('click', deleteAllUserData);
+
+async function deleteAllUserData() {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+
+  const confirmed = confirm(
+    'This will permanently delete all your workout logs and body weight history. This cannot be undone.\n\n' +
+    'Your account itself will not be deleted — you can sign back in afterward to an empty account.\n\n' +
+    'Consider exporting your data first (Charts tab).\n\n' +
+    'Continue?'
+  );
+  if (!confirmed) return;
+
+  const btn = document.getElementById('btn-delete-account');
+  btn.disabled = true;
+
+  try {
+    const { data: sessions } = await sb.from('sessions').select('id').eq('user_id', user.id);
+    const sessionIds = (sessions || []).map(s => s.id);
+
+    if (sessionIds.length) {
+      await sb.from('sets').delete().in('session_id', sessionIds);
+    }
+
+    await Promise.all([
+      sb.from('sessions').delete().eq('user_id', user.id),
+      sb.from('exercises').delete().eq('user_id', user.id),
+      sb.from('body_weights').delete().eq('user_id', user.id),
+    ]);
+
+    alert('All your data has been deleted.');
+    await sb.auth.signOut();
+  } catch (err) {
+    console.error('deleteAllUserData:', err);
+    alert('Failed to delete your data. Please try again.');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 // ── Load existing records for selected date ──
 async function loadDateRecord(date) {
   if (!date) { renderExerciseBlocks(); return; }
