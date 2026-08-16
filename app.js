@@ -252,6 +252,7 @@ let sessionExercises = [];
 let activeCategory = CATEGORIES[0];
 let currentUnit = 'kg';
 let existingSessionIds = [];
+let sessionChanged = false;
 let calendarYear    = new Date().getFullYear();
 let calendarMonth   = new Date().getMonth();
 let calSessionDates = new Set();
@@ -369,6 +370,7 @@ async function addExercise(name, category, id = null) {
 
 function removeExercise(index) {
   sessionExercises.splice(index, 1);
+  sessionChanged = true;
   renderExerciseBlocks();
 }
 
@@ -385,6 +387,7 @@ function setInputType(category) {
 
 function removeSet(ei, si) {
   sessionExercises[ei].sets.splice(si, 1);
+  sessionChanged = true;
   renderExerciseBlocks();
 }
 
@@ -680,6 +683,7 @@ async function deleteAllUserData() {
 
 // ── Load existing records for selected date ──
 async function loadDateRecord(date) {
+  sessionChanged = false;
   if (!date) { renderExerciseBlocks(); return; }
   const { data: { user } } = await sb.auth.getUser();
   if (!user) { renderExerciseBlocks(); return; }
@@ -738,7 +742,7 @@ async function loadDateRecord(date) {
 function updateSaveButton() {
   const hasData = existingSessionIds.length > 0;
   const canSave = hasData
-    ? sessionExercises.some(ex => ex.isEditing)
+    ? sessionChanged || sessionExercises.some(ex => ex.isEditing)
     : sessionExercises.some(ex => ex.sets.length > 0);
 
   const saveBtn = document.getElementById('btn-save-exercise');
