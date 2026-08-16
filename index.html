@@ -6,10 +6,12 @@
   <title>muscle-log</title>
   <meta name="description" content="シンプルな筋トレ記録アプリ" />
   <meta name="theme-color" content="#3ea8ff" />
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="muscle-log" />
   <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icon-512.png" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -265,7 +267,9 @@
         <ul class="exercise-list" id="exercise-list"></ul>
         <div class="custom-exercise-section">
           <div class="custom-exercise-form">
-            <input type="text" id="custom-exercise-input" placeholder="Custom exercise name" />
+            <input type="text" id="custom-exercise-input" placeholder="Custom exercise name" required />
+            <input type="text" id="custom-exercise-unit-input" class="hidden" placeholder="Unit (e.g. km/h, Level)" required />
+            <p id="custom-exercise-error" class="auth-error hidden"></p>
             <button class="btn btn-primary" id="btn-save-custom">Add</button>
           </div>
         </div>
@@ -278,7 +282,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <script src="app.js"></script>
   <script>
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
   </script>
 
 </body>

@@ -1,5 +1,5 @@
-const CACHE = 'muscle-log-v2';
-const STATIC = ['/', '/index.html', '/style.css', '/app.js'];
+const CACHE = 'muscle-log-v3';
+const STATIC = ['./', './index.html', './style.css', './app.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(STATIC)));

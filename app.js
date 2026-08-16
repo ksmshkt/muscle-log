@@ -246,6 +246,10 @@ const PRESETS = {
   Cardio:    ['Running', 'Bike'],
 };
 const CATEGORIES = Object.keys(PRESETS);
+const CARDIO_UNITS = { Running: 'km/h', Bike: 'Level' };
+function resolveCardioUnit(name, category, dbUnit) {
+  return category === 'Cardio' ? (CARDIO_UNITS[name] || dbUnit || 'Value') : undefined;
+}
 
 let customExercises = [];
 let sessionExercises = [];
@@ -265,7 +269,14 @@ const modalCloseBtn   = document.getElementById('modal-close');
 const categoryTabsEl  = document.getElementById('category-tabs');
 const exerciseListEl  = document.getElementById('exercise-list');
 const customInput     = document.getElementById('custom-exercise-input');
+const customUnitInput = document.getElementById('custom-exercise-unit-input');
+const customErrorEl   = document.getElementById('custom-exercise-error');
 const btnSaveCustom   = document.getElementById('btn-save-custom');
+
+function setCustomExerciseError(msg) {
+  customErrorEl.textContent = msg;
+  customErrorEl.classList.toggle('hidden', !msg);
+}
 const btnAddExercise    = document.getElementById('btn-add-exercise');
 const exerciseBlocksEl  = document.getElementById('exercise-blocks');
 const inputBodyWeight     = document.getElementById('input-body-weight');
@@ -276,7 +287,7 @@ const logDateInput        = document.getElementById('log-date');
 async function loadCustomExercises() {
   const { data, error } = await sb
     .from('exercises')
-    .select('id, name, category')
+    .select('id, name, category, cardio_unit')
     .eq('is_preset', false)
     .order('name');
   if (!error && data) customExercises = data;
@@ -293,6 +304,8 @@ function openModal() {
 function closeModal() {
   modalExercise.classList.add('hidden');
   customInput.value = '';
+  customUnitInput.value = '';
+  setCustomExerciseError('');
 }
 
 btnAddExercise.addEventListener('click', openModal);
@@ -312,17 +325,20 @@ function renderCategoryTabs() {
       renderExerciseList();
     });
   });
+
+  customUnitInput.classList.toggle('hidden', activeCategory !== 'Cardio');
+  setCustomExerciseError('');
 }
 
 // ── Exercise list ──
 function renderExerciseList() {
-  const presets = (PRESETS[activeCategory] || []).map(name => ({ name, category: activeCategory, id: null }));
+  const presets = (PRESETS[activeCategory] || []).map(name => ({ name, category: activeCategory, id: null, cardio_unit: CARDIO_UNITS[name] || null }));
   const customs = customExercises.filter(e => e.category === activeCategory);
   const all = [...presets, ...customs];
 
   exerciseListEl.innerHTML = all.length
     ? all.map(ex => `
-        <li data-name="${ex.name}" data-cat="${ex.category}"${ex.id ? ` data-id="${ex.id}"` : ''}>
+        <li data-name="${ex.name}" data-cat="${ex.category}"${ex.id ? ` data-id="${ex.id}"` : ''}${ex.cardio_unit ? ` data-unit="${ex.cardio_unit}"` : ''}>
           <span class="ex-name">${ex.name}</span>
           ${ex.id ? `<button class="btn-delete-custom" data-id="${ex.id}" data-name="${ex.name}">✕</button>` : ''}
         </li>`).join('')
@@ -330,7 +346,7 @@ function renderExerciseList() {
 
   exerciseListEl.querySelectorAll('li[data-name]').forEach(li => {
     li.addEventListener('click', () => {
-      addExercise(li.dataset.name, li.dataset.cat, li.dataset.id || null);
+      addExercise(li.dataset.name, li.dataset.cat, li.dataset.id || null, li.dataset.unit || null);
       closeModal();
     });
   });
@@ -344,8 +360,8 @@ function renderExerciseList() {
 }
 
 // ── Exercise blocks ──
-async function addExercise(name, category, id = null) {
-  const entry = { name, category, id, sets: [], isEditing: true, isExpanded: true, prevWeight: null, prevReps: null, prevDuration: null };
+async function addExercise(name, category, id = null, cardioUnit = null) {
+  const entry = { name, category, id, cardioUnit, sets: [], isEditing: true, isExpanded: true, prevWeight: null, prevReps: null, prevDuration: null, prevValue2: null };
   sessionExercises.unshift(entry);
   renderExerciseBlocks();
 
@@ -359,12 +375,13 @@ async function addExercise(name, category, id = null) {
   const { data: prevSessions } = await sb.from('sessions').select('id').eq('user_id', user.id).lt('date', currentDate).order('date', { ascending: false }).limit(20);
   if (!prevSessions?.length || !sessionExercises.includes(entry)) return;
 
-  const { data: prevSets } = await sb.from('sets').select('weight, reps, duration').eq('exercise_id', exRow.id).in('session_id', prevSessions.map(s => s.id)).order('id', { ascending: false }).limit(1);
+  const { data: prevSets } = await sb.from('sets').select('weight, reps, duration, value2').eq('exercise_id', exRow.id).in('session_id', prevSessions.map(s => s.id)).order('id', { ascending: false }).limit(1);
   if (!prevSets?.length || !sessionExercises.includes(entry)) return;
 
   entry.prevWeight   = prevSets[0].weight;
   entry.prevReps     = prevSets[0].reps;
   entry.prevDuration = prevSets[0].duration;
+  entry.prevValue2   = prevSets[0].value2;
   renderExerciseBlocks();
 }
 
@@ -374,8 +391,8 @@ function removeExercise(index) {
   renderExerciseBlocks();
 }
 
-function addSet(ei, weight, reps, duration = null) {
-  sessionExercises[ei].sets.push({ weight, reps, duration });
+function addSet(ei, weight, reps, duration = null, value2 = null) {
+  sessionExercises[ei].sets.push({ weight, reps, duration, value2 });
   renderExerciseBlocks();
 }
 
@@ -403,8 +420,10 @@ function renderExerciseBlocks() {
     const expanded = editing || ex.isExpanded !== false;
     const setCount = ex.sets.length;
 
+    const cardioUnit = ex.cardioUnit || 'Value';
+
     const setDetailHTML = (s) => {
-      if (itype === 'cardio') return `${s.duration} min`;
+      if (itype === 'cardio') return `${s.duration} min${s.value2 != null ? ` · ${s.value2} ${cardioUnit}` : ''}`;
       if (itype === 'core')   return `${s.reps} reps`;
       return `${s.weight} ${currentUnit} × ${s.reps} reps`;
     };
@@ -413,9 +432,10 @@ function renderExerciseBlocks() {
     const phWeight   = lastSet?.weight   ?? ex.prevWeight   ?? 0;
     const phReps     = lastSet?.reps     ?? ex.prevReps     ?? 0;
     const phDuration = lastSet?.duration ?? ex.prevDuration ?? 0;
+    const phValue2   = lastSet?.value2   ?? ex.prevValue2   ?? 0;
 
     const inputRowHTML = itype === 'cardio'
-      ? `<input type="number" class="input-duration" data-ei="${i}" placeholder="${phDuration}" min="0" step="1" /><span>min</span>`
+      ? `<input type="number" class="input-duration" data-ei="${i}" placeholder="${phDuration}" min="0" step="1" /><span>min</span><input type="number" class="input-cardio-value" data-ei="${i}" placeholder="${phValue2}" min="0" step="0.1" /><span>${cardioUnit}</span>`
       : itype === 'core'
       ? `<input type="number" class="input-reps" data-ei="${i}" placeholder="${phReps}" min="1" step="1" /><span>reps</span>`
       : `<input type="number" class="input-weight" data-ei="${i}" placeholder="${phWeight}" min="0" step="0.5" /><span>${currentUnit}</span><span class="set-sep">×</span><input type="number" class="input-reps" data-ei="${i}" placeholder="${phReps}" min="1" step="1" /><span>reps</span>`;
@@ -478,6 +498,14 @@ function renderExerciseBlocks() {
     btn.addEventListener('click', () => removeExercise(+btn.dataset.i));
   });
 
+  const readCardioValue2 = (ei) => {
+    const el = exerciseBlocksEl.querySelector(`.input-cardio-value[data-ei="${ei}"]`);
+    const raw = el.value.trim();
+    if (raw !== '') return parseFloat(raw);
+    const ph = parseFloat(el.placeholder);
+    return ph || null;
+  };
+
   exerciseBlocksEl.querySelectorAll('.btn-add-set').forEach(btn => {
     btn.addEventListener('click', () => {
       const ei    = +btn.dataset.ei;
@@ -486,7 +514,7 @@ function renderExerciseBlocks() {
         const durEl  = exerciseBlocksEl.querySelector(`.input-duration[data-ei="${ei}"]`);
         const duration = parseInt(durEl.value) || parseInt(durEl.placeholder) || 0;
         if (!duration) return;
-        addSet(ei, null, null, duration);
+        addSet(ei, null, null, duration, readCardioValue2(ei));
       } else if (itype === 'core') {
         const repsEl = exerciseBlocksEl.querySelector(`.input-reps[data-ei="${ei}"]`);
         const reps   = parseInt(repsEl.value) || parseInt(repsEl.placeholder) || 0;
@@ -525,14 +553,24 @@ function renderExerciseBlocks() {
       if (e.key !== 'Enter') return;
       const ei       = +input.dataset.ei;
       const duration = parseInt(input.value) || parseInt(input.placeholder) || 0;
-      if (duration) addSet(ei, null, null, duration);
+      if (duration) addSet(ei, null, null, duration, readCardioValue2(ei));
+    });
+  });
+
+  exerciseBlocksEl.querySelectorAll('.input-cardio-value').forEach(input => {
+    input.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      const ei      = +input.dataset.ei;
+      const durEl   = exerciseBlocksEl.querySelector(`.input-duration[data-ei="${ei}"]`);
+      const duration = parseInt(durEl.value) || parseInt(durEl.placeholder) || 0;
+      if (duration) addSet(ei, null, null, duration, readCardioValue2(ei));
     });
   });
 
   exerciseBlocksEl.querySelectorAll('.btn-copy-set').forEach(btn => {
     btn.addEventListener('click', () => {
-      const { weight, reps, duration } = sessionExercises[+btn.dataset.ei].sets[+btn.dataset.si];
-      addSet(+btn.dataset.ei, weight, reps, duration);
+      const { weight, reps, duration, value2 } = sessionExercises[+btn.dataset.ei].sets[+btn.dataset.si];
+      addSet(+btn.dataset.ei, weight, reps, duration, value2);
     });
   });
 
@@ -710,10 +748,10 @@ async function loadDateRecord(date) {
 
   const [{ data: sets }, { data: exercises }] = await Promise.all([
     sb.from('sets')
-      .select('exercise_id, weight, reps, duration, unit')
+      .select('exercise_id, weight, reps, duration, value2, unit')
       .in('session_id', existingSessionIds)
       .order('id', { ascending: true }),
-    sb.from('exercises').select('id, name, category').eq('user_id', user.id),
+    sb.from('exercises').select('id, name, category, cardio_unit').eq('user_id', user.id),
   ]);
 
   const exMap = Object.fromEntries((exercises || []).map(ex => [ex.id, ex]));
@@ -723,10 +761,10 @@ async function loadDateRecord(date) {
     const ex = exMap[set.exercise_id];
     if (!ex) return;
     if (!exerciseMap[ex.name]) {
-      exerciseMap[ex.name] = { name: ex.name, category: ex.category, id: ex.id, sets: [], isEditing: false, isExpanded: false };
+      exerciseMap[ex.name] = { name: ex.name, category: ex.category, id: ex.id, cardioUnit: resolveCardioUnit(ex.name, ex.category, ex.cardio_unit), sets: [], isEditing: false, isExpanded: false };
       exerciseOrder.push(ex.name);
     }
-    exerciseMap[ex.name].sets.push({ weight: set.weight, reps: set.reps, duration: set.duration });
+    exerciseMap[ex.name].sets.push({ weight: set.weight, reps: set.reps, duration: set.duration, value2: set.value2 });
   });
 
   sessionExercises = exerciseOrder.map(n => exerciseMap[n]).sort((a, b) => {
@@ -830,6 +868,7 @@ async function saveExercise() {
         weight: s.weight ?? null,
         reps: s.reps ?? null,
         duration: s.duration ?? null,
+        value2: s.value2 ?? null,
         unit: currentUnit,
       }))
     );
@@ -871,21 +910,29 @@ inputBodyWeight.addEventListener('blur', () => {
 // ── Save custom exercise ──
 btnSaveCustom.addEventListener('click', async () => {
   const name = customInput.value.trim();
-  if (!name) return;
+  if (!name) { setCustomExerciseError('Enter an exercise name.'); return; }
+
+  const cardioUnit = activeCategory === 'Cardio' ? customUnitInput.value.trim() : null;
+  if (activeCategory === 'Cardio' && !cardioUnit) { setCustomExerciseError('Enter a unit for this exercise.'); return; }
+
+  setCustomExerciseError('');
 
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return;
 
   const { data, error } = await sb
     .from('exercises')
-    .insert({ user_id: user.id, name, category: activeCategory, is_preset: false })
+    .insert({ user_id: user.id, name, category: activeCategory, is_preset: false, cardio_unit: cardioUnit })
     .select()
     .single();
 
   if (!error && data) {
     customExercises.push(data);
     customInput.value = '';
+    customUnitInput.value = '';
     renderExerciseList();
+  } else {
+    setCustomExerciseError('Could not add exercise. Try again.');
   }
 });
 
@@ -915,10 +962,10 @@ async function loadExercisesFromDate(sourceDate) {
   const sessionIds = sessions.map(s => s.id);
   const [{ data: sets }, { data: exercises }] = await Promise.all([
     sb.from('sets')
-      .select('exercise_id, weight, reps, duration, unit')
+      .select('exercise_id, weight, reps, duration, value2, unit')
       .in('session_id', sessionIds)
       .order('id', { ascending: true }),
-    sb.from('exercises').select('id, name, category').eq('user_id', user.id),
+    sb.from('exercises').select('id, name, category, cardio_unit').eq('user_id', user.id),
   ]);
 
   const exMap = Object.fromEntries((exercises || []).map(ex => [ex.id, ex]));
@@ -929,12 +976,12 @@ async function loadExercisesFromDate(sourceDate) {
     if (!ex) return;
     if (!exerciseMap[ex.name]) {
       exerciseMap[ex.name] = {
-        name: ex.name, category: ex.category, id: ex.id,
+        name: ex.name, category: ex.category, id: ex.id, cardioUnit: resolveCardioUnit(ex.name, ex.category, ex.cardio_unit),
         sets: [], isEditing: true, isExpanded: true,
       };
       exerciseOrder.push(ex.name);
     }
-    exerciseMap[ex.name].sets.push({ weight: set.weight, reps: set.reps, duration: set.duration });
+    exerciseMap[ex.name].sets.push({ weight: set.weight, reps: set.reps, duration: set.duration, value2: set.value2 });
   });
 
   sessionExercises = exerciseOrder.map(n => exerciseMap[n]).sort((a, b) => {
@@ -1471,7 +1518,7 @@ document.getElementById('btn-delete-log').addEventListener('click', async () => 
 });
 
 // ── Data Export ──
-const EXPORT_HEADERS = ['date', 'type', 'exercise_name', 'category', 'set_number', 'weight', 'reps', 'duration', 'unit'];
+const EXPORT_HEADERS = ['date', 'type', 'exercise_name', 'category', 'set_number', 'weight', 'reps', 'duration', 'value2', 'unit'];
 
 function csvEscape(value) {
   if (value == null) return '';
@@ -1508,6 +1555,7 @@ function buildExportRows({ sessions, exercises, sets, bodyWeights }) {
         weight: s.weight,
         reps: s.reps,
         duration: s.duration,
+        value2: s.value2,
         unit: s.unit,
       };
     })
@@ -1522,6 +1570,7 @@ function buildExportRows({ sessions, exercises, sets, bodyWeights }) {
     weight: b.weight,
     reps: '',
     duration: '',
+    value2: '',
     unit: b.unit,
   }));
 
@@ -1564,7 +1613,7 @@ async function exportUserData() {
     const sessionIds = sessions.map(s => s.id);
 
     const { data: sets } = sessionIds.length
-      ? await sb.from('sets').select('session_id, exercise_id, weight, reps, duration, unit').in('session_id', sessionIds).order('id', { ascending: true })
+      ? await sb.from('sets').select('session_id, exercise_id, weight, reps, duration, value2, unit').in('session_id', sessionIds).order('id', { ascending: true })
       : { data: [] };
 
     const rows = buildExportRows({ sessions, exercises: exercises || [], sets: sets || [], bodyWeights });
