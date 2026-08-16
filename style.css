@@ -833,13 +833,27 @@ main {
   right: 0;
   z-index: 10;
   display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 6px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px;
   background: var(--surface);
   border-radius: 6px;
   border: 1px solid var(--border, rgba(255,255,255,0.15));
   box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+
+.copy-date-hint {
+  max-width: 190px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: var(--text-sub);
+}
+
+.copy-date-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .copy-date-row input[type="date"] {
@@ -1064,6 +1078,7 @@ main {
 
 .modal-bw-center {
   flex: 0 0 auto;
+  margin-left: -32px;
   display: flex;
   align-items: center;
 }
