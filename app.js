@@ -787,6 +787,7 @@ function updateSaveButton() {
   saveBtn.textContent = hasData ? 'Update' : 'Save';
   saveBtn.disabled = !canSave;
   document.getElementById('btn-delete-log').classList.toggle('hidden', !hasData);
+  document.getElementById('btn-share-log').classList.toggle('hidden', !hasData);
 }
 
 async function changeLogDate(newDate) {
@@ -1507,6 +1508,175 @@ document.getElementById('copy-date-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') executeCopy(e.target.value);
 });
 document.getElementById('btn-confirm-copy').addEventListener('click', () => executeCopy(document.getElementById('copy-date-input').value));
+
+// ── Share log ──
+function formatDateShort(dateStr) {
+  const [y, m, d] = dateStr.split('-');
+  return `${y}/${Number(m)}/${Number(d)}`;
+}
+
+const CATEGORY_COLORS = {
+  Chest: '#ef4444', Back: '#22c55e', Legs: '#8b5cf6', Shoulders: '#f97316',
+  Arms: '#ec4899', Core: '#eab308', Cardio: '#06b6d4',
+};
+
+function getShareHighlight(ex) {
+  if (ex.category === 'Cardio') {
+    const set = ex.sets.reduce((a, b) => (b.duration || 0) > (a.duration || 0) ? b : a, ex.sets[0]);
+    const unit = ex.cardioUnit || 'Value';
+    const primary = set.value2 != null ? `${set.duration}min / ${set.value2}${unit}` : `${set.duration}min`;
+    return { name: ex.name, category: ex.category, primary, sub: ex.sets.length > 1 ? `${ex.sets.length} sets` : '' };
+  }
+  const set = ex.sets.reduce((a, b) => (b.weight || 0) > (a.weight || 0) ? b : a, ex.sets[0]);
+  return { name: ex.name, category: ex.category, primary: `${set.weight}${currentUnit} × ${set.reps}`, sub: ex.sets.length > 1 ? `${ex.sets.length} sets` : '' };
+}
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
+
+async function buildShareCard(date, highlights) {
+  const font = (size, weight = '') => `${weight} ${size}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`.trim();
+
+  const rows = highlights.slice(0, 5);
+  const overflow = highlights.length - rows.length;
+  const rowCount = rows.length + (overflow > 0 ? 1 : 0);
+  const innerPad = 20;
+  const rowH = 56;
+
+  const margin = 56;
+  const cardW = 760;
+  const cardH = innerPad * 2 + rowH * rowCount;
+  const iconSize = 52;
+  const maxRowCount = 6; // 5 highlighted rows + 1 possible overflow row
+  const maxCardH = innerPad * 2 + rowH * maxRowCount;
+  const headerH = margin + iconSize + 60;
+
+  // Fixed canvas size/ratio so X doesn't crop the image differently per post.
+  const canvasW = cardW + margin * 2;
+  const canvasH = headerH + maxCardH + 60;
+  const cardX = margin;
+  const cardY = headerH + (maxCardH - cardH) / 2;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = canvasW;
+  canvas.height = canvasH;
+  const ctx = canvas.getContext('2d');
+
+  const grad = ctx.createLinearGradient(0, 0, canvasW, canvasH);
+  grad.addColorStop(0, '#3ea8ff');
+  grad.addColorStop(1, '#1565c0');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvasW, canvasH);
+
+  const icon = await loadImage('icon-512.png');
+  ctx.drawImage(icon, margin, margin, iconSize, iconSize);
+
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = font(32, 'bold');
+  ctx.fillText('muscle-log', margin + iconSize + 16, margin + iconSize / 2 + 11);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.font = font(23);
+  ctx.fillText(formatDateLabel(date), margin, margin + iconSize + 34);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.roundRect(cardX, cardY, cardW, cardH, 20);
+  ctx.fill();
+
+  rows.forEach((ex, i) => {
+    const rowY = cardY + innerPad + rowH * i;
+    const color = CATEGORY_COLORS[ex.category] || '#3ea8ff';
+    const midY = rowY + rowH / 2;
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.roundRect(cardX + 24, midY - 14, 5, 28, 2.5);
+    ctx.fill();
+
+    const nameX = cardX + 24 + 18;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#333333';
+    ctx.font = font(25, 'bold');
+    ctx.fillText(ex.name, nameX, midY + 8);
+
+    if (ex.sub) {
+      const nameW = ctx.measureText(ex.name).width;
+      ctx.fillStyle = '#999999';
+      ctx.font = font(16);
+      ctx.fillText(ex.sub, nameX + nameW + 10, midY + 6);
+    }
+
+    ctx.textAlign = 'right';
+    ctx.fillStyle = color;
+    ctx.font = font(25, 'bold');
+    ctx.fillText(ex.primary, cardX + cardW - 24, midY + 8);
+  });
+
+  if (overflow > 0) {
+    const rowY = cardY + innerPad + rowH * rows.length;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#999999';
+    ctx.font = `italic ${font(18)}`;
+    ctx.fillText(`+${overflow} more`, cardX + 24 + 18, rowY + rowH / 2 + 6);
+  }
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.font = font(18);
+  ctx.fillText('muscle-log-lilac.vercel.app', canvasW / 2, canvasH - 30);
+
+  return canvas;
+}
+
+document.getElementById('btn-share-log').addEventListener('click', async () => {
+  const date = logDateInput.value || today();
+  const highlights = sessionExercises.filter(ex => ex.sets.length > 0).map(getShareHighlight);
+  if (!highlights.length) return;
+
+  let canvas;
+  try {
+    canvas = await buildShareCard(date, highlights);
+  } catch (err) {
+    console.error('buildShareCard failed:', err);
+    alert('Could not create the share image. Please try again.');
+    return;
+  }
+  canvas.toBlob(async (blob) => {
+    if (!blob) return;
+    const filename = `muscle-log-${date}.png`;
+    const file = new File([blob], filename, { type: 'image/png' });
+    const caption = `${formatDateShort(date)}の記録 💪\n\n#筋トレ記録 #musclelog\nhttps://muscle-log-lilac.vercel.app/`;
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], text: caption });
+      } catch (err) {
+        if (err.name !== 'AbortError') console.error('share failed:', err);
+      }
+      return;
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+    const tweetText = encodeURIComponent(caption);
+    window.open(`https://twitter.com/intent/tweet?text=${tweetText}`, '_blank');
+  }, 'image/png');
+});
 
 // ── Delete log ──
 document.getElementById('btn-delete-log').addEventListener('click', async () => {
