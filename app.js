@@ -5,6 +5,15 @@ const sb = createClient(
   'sb_publishable_-5Bgp5N-7LT6P7Lx6b_90A_kLtkHWDz'
 );
 
+// ── Offline banner ──
+const offlineBanner = document.getElementById('offline-banner');
+function updateOfflineBanner() {
+  offlineBanner.classList.toggle('hidden', navigator.onLine);
+}
+window.addEventListener('online', updateOfflineBanner);
+window.addEventListener('offline', updateOfflineBanner);
+updateOfflineBanner();
+
 // ── DOM refs ──
 const authScreen   = document.getElementById('auth-screen');
 const app          = document.getElementById('app');

@@ -83,6 +83,8 @@
     </div>
   </div>
 
+  <div id="offline-banner" class="offline-banner hidden" role="status">You're offline. Records can't be loaded or saved.</div>
+
   <!-- ── Main App ── -->
   <div id="app" class="hidden">
     <header>
@@ -288,8 +290,8 @@
 
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
   <script src="app.js"></script>
   <script>
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
