@@ -1527,8 +1527,12 @@ function getShareHighlight(ex) {
     const primary = set.value2 != null ? `${set.duration}min / ${set.value2}${unit}` : `${set.duration}min`;
     return { name: ex.name, category: ex.category, primary, sub: ex.sets.length > 1 ? `${ex.sets.length} sets` : '' };
   }
+  if (setInputType(ex.category) === 'core') {
+    const set = ex.sets.reduce((a, b) => (b.reps || 0) > (a.reps || 0) ? b : a, ex.sets[0]);
+    return { name: ex.name, category: ex.category, primary: `${set.reps} reps`, sub: ex.sets.length > 1 ? `${ex.sets.length} sets` : '' };
+  }
   const set = ex.sets.reduce((a, b) => (b.weight || 0) > (a.weight || 0) ? b : a, ex.sets[0]);
-  return { name: ex.name, category: ex.category, primary: `${set.weight}${currentUnit} × ${set.reps}`, sub: ex.sets.length > 1 ? `${ex.sets.length} sets` : '' };
+  return { name: ex.name, category: ex.category, primary: `${set.weight}${currentUnit} × ${set.reps} reps`, sub: ex.sets.length > 1 ? `${ex.sets.length} sets` : '' };
 }
 
 function loadImage(src) {
