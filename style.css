@@ -225,6 +225,9 @@ body {
 
 /* ── Header ── */
 header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   background: var(--surface);
   padding: 14px 20px;
   font-size: 20px;
@@ -331,7 +334,11 @@ header {
 nav {
   background: var(--surface);
   display: flex;
-  border-bottom: 1px solid var(--border);
+  border-top: 1px solid var(--border);
+  position: sticky;
+  bottom: 0;
+  z-index: 10;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 nav button {
@@ -359,18 +366,17 @@ nav button.active {
 nav button.active::after {
   content: "";
   position: absolute;
-  bottom: 0;
+  top: 0;
   left: 10%;
   width: 80%;
   height: 2px;
   background: var(--primary);
-  border-radius: 2px 2px 0 0;
+  border-radius: 0 0 2px 2px;
 }
 
 /* ── Tab pages ── */
 main {
   flex: 1;
-  overflow-y: auto;
 }
 
 .page {
@@ -406,7 +412,12 @@ main {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 16px;
+  position: sticky;
+  top: var(--header-h, 0px);
+  z-index: 5;
+  background: var(--bg);
+  margin: -10px -20px 6px;
+  padding: 10px 20px;
 }
 
 .btn-export {
@@ -1724,7 +1735,7 @@ main {
   }
 
   #page-charts .period-tabs {
-    margin-bottom: 10px;
+    margin-bottom: 0;
   }
 
   #modal-log .modal-content > .modal-log-top,

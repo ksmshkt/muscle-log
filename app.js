@@ -14,6 +14,12 @@ window.addEventListener('online', updateOfflineBanner);
 window.addEventListener('offline', updateOfflineBanner);
 updateOfflineBanner();
 
+// ── Sticky header height (sticky rows below it offset by this) ──
+const appHeader = document.querySelector('#app header');
+new ResizeObserver(() => {
+  document.documentElement.style.setProperty('--header-h', `${appHeader.offsetHeight}px`);
+}).observe(appHeader);
+
 // ── DOM refs ──
 const authScreen   = document.getElementById('auth-screen');
 const app          = document.getElementById('app');
@@ -1429,12 +1435,16 @@ document.getElementById('cal-next').addEventListener('click', () => {
 let calSwipeStartX = 0;
 let calSwipeStartY = 0;
 
-document.querySelector('.log-calendar-section').addEventListener('touchstart', e => {
+const mainEl  = document.querySelector('main');
+const pageLog = document.getElementById('page-log');
+
+mainEl.addEventListener('touchstart', e => {
   calSwipeStartX = e.touches[0].clientX;
   calSwipeStartY = e.touches[0].clientY;
 }, { passive: true });
 
-document.querySelector('.log-calendar-section').addEventListener('touchend', e => {
+mainEl.addEventListener('touchend', e => {
+  if (!pageLog.classList.contains('active')) return;
   const dx = e.changedTouches[0].clientX - calSwipeStartX;
   const dy = e.changedTouches[0].clientY - calSwipeStartY;
   if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
