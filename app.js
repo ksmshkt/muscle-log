@@ -95,6 +95,7 @@ function closeLogModal() {
   sessionExercises = [];
   existingSessionIds = [];
   inputBodyWeight.value = '';
+  bwSavedValue = '';
   const d = new Date(logDateInput.value || today());
   calendarYear  = d.getUTCFullYear();
   calendarMonth = d.getUTCMonth();
@@ -271,6 +272,7 @@ let sessionExercises = [];
 let activeCategory = CATEGORIES[0];
 let currentUnit = 'kg';
 let existingSessionIds = [];
+let bwSavedValue = '';
 let sessionChanged = false;
 let calendarYear    = new Date().getFullYear();
 let calendarMonth   = new Date().getMonth();
@@ -751,6 +753,7 @@ async function loadDateRecord(date) {
     .order('id', { ascending: false }).limit(1);
   const bwRow = bwRows?.[0];
   if (bwRow) inputBodyWeight.value = bwRow.weight;
+  bwSavedValue = bwRow ? String(bwRow.weight) : '';
 
   if (!sessions?.length) {
     existingSessionIds = [];
@@ -902,9 +905,9 @@ async function saveExercise() {
 
 // ── Auto-save body weight ──
 async function saveBodyWeight(date, val) {
-  if (!val || !date) return;
+  if (!val || !date) return false;
   const { data: { user } } = await sb.auth.getUser();
-  if (!user) return;
+  if (!user) return false;
   await sb.from('body_weights').delete().eq('user_id', user.id).eq('date', date);
   const { error } = await sb.from('body_weights').insert({
     user_id: user.id,
@@ -912,15 +915,56 @@ async function saveBodyWeight(date, val) {
     weight: val,
     unit: currentUnit,
   });
-  if (error) { console.error('saveBodyWeight:', error); return; }
+  if (error) { console.error('saveBodyWeight:', error); return false; }
   calAllDates.add(date);
   renderCalendarGrid();
+  return true;
 }
 
-inputBodyWeight.addEventListener('blur', () => {
-  const val = parseFloat(inputBodyWeight.value);
+async function removeBodyWeight(date) {
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return false;
+  const { error } = await sb.from('body_weights').delete().eq('user_id', user.id).eq('date', date);
+  if (error) { console.error('removeBodyWeight:', error); return false; }
+  if (!calSessionDates.has(date)) calAllDates.delete(date);
+  renderCalendarGrid();
+  return true;
+}
+
+const bwStatusEl = document.getElementById('bw-status');
+let bwStatusTimer = null;
+
+function showBwStatus(message, isError = false) {
+  bwStatusEl.textContent = message;
+  bwStatusEl.classList.toggle('bw-status-error', isError);
+  bwStatusEl.classList.remove('hidden');
+  clearTimeout(bwStatusTimer);
+  bwStatusTimer = setTimeout(() => bwStatusEl.classList.add('hidden'), 2000);
+}
+
+inputBodyWeight.addEventListener('blur', async () => {
   const date = logDateInput.value || today();
-  saveBodyWeight(date, val);
+  // A number input reports an empty value for unparsable text, so badInput tells the two apart.
+  if (inputBodyWeight.validity.badInput) {
+    showBwStatus('Enter a number', true);
+    return;
+  }
+
+  const raw = inputBodyWeight.value.trim();
+  if (raw === bwSavedValue) return;
+
+  if (raw === '') {
+    const removed = await removeBodyWeight(date);
+    if (removed) bwSavedValue = '';
+    showBwStatus(removed ? 'Saved' : "Couldn't save", !removed);
+    return;
+  }
+
+  const val = parseFloat(raw);
+  if (!val) return;
+  const saved = await saveBodyWeight(date, val);
+  if (saved) bwSavedValue = raw;
+  showBwStatus(saved ? 'Saved' : "Couldn't save", !saved);
 });
 
 // ── Save custom exercise ──

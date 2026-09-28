@@ -1088,10 +1088,27 @@ main {
 }
 
 .modal-bw-center {
+  position: relative;
   flex: 0 0 auto;
   margin-left: -32px;
   display: flex;
   align-items: center;
+}
+
+.bw-status {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.bw-status.bw-status-error {
+  color: #ef4444;
 }
 
 .modal-side-actions {
