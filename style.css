@@ -1778,3 +1778,109 @@ main {
   white-space: nowrap;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
+
+/* ── Personal best celebration ── */
+.pr-modal {
+  align-items: center;
+  justify-content: center;
+  z-index: 110;
+  padding: 20px;
+}
+
+.pr-card {
+  position: relative;
+  background: var(--surface);
+  border-radius: 20px;
+  width: 100%;
+  max-width: 340px;
+  padding: 8px 24px 24px;
+  text-align: center;
+  animation: prPop 0.25s ease-out;
+}
+
+@keyframes prPop {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.pr-trophy-area {
+  position: relative;
+  height: 108px;
+  overflow: hidden;
+}
+
+.pr-trophy {
+  font-size: 56px;
+  line-height: 108px;
+}
+
+.pr-confetti {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.pr-confetti span {
+  position: absolute;
+  top: -12px;
+  width: 8px;
+  height: 12px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: prFall 1.6s linear infinite;
+}
+
+@keyframes prFall {
+  0%   { opacity: 0; transform: translateY(0) rotate(0deg); }
+  10%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(120px) rotate(540deg); }
+}
+
+.pr-title {
+  font-size: 19px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.pr-list {
+  list-style: none;
+  margin-bottom: 20px;
+}
+
+.pr-list li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.pr-list li:last-child { border-bottom: none; }
+
+.pr-ex-name {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.pr-ex-detail {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+#btn-pr-close {
+  width: auto;
+  min-width: 120px;
+  padding: 9px 24px;
+  font-size: 14px;
+}
+
+.pr-ex-prev {
+  font-size: 12px;
+  color: var(--text-sub);
+  margin-left: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pr-confetti span,
+  .pr-card { animation: none; }
+}

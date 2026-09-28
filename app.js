@@ -378,7 +378,7 @@ function renderExerciseList() {
 
 // ── Exercise blocks ──
 async function addExercise(name, category, id = null, cardioUnit = null) {
-  const entry = { name, category, id, cardioUnit, sets: [], isEditing: true, isExpanded: true, prevWeight: null, prevReps: null, prevDuration: null, prevValue2: null };
+  const entry = { name, category, id, cardioUnit, sets: [], isEditing: true, isExpanded: true, prevWeight: null, prevReps: null, prevDuration: null, prevValue2: null, prevBest: null };
   sessionExercises.unshift(entry);
   renderExerciseBlocks();
 
@@ -389,11 +389,19 @@ async function addExercise(name, category, id = null, cardioUnit = null) {
   if (!exRow || !sessionExercises.includes(entry)) return;
 
   const currentDate = logDateInput.value || today();
-  const { data: prevSessions } = await sb.from('sessions').select('id').eq('user_id', user.id).lt('date', currentDate).order('date', { ascending: false }).limit(20);
+  const { data: prevSessions } = await sb.from('sessions').select('id').eq('user_id', user.id).lt('date', currentDate).order('date', { ascending: false });
   if (!prevSessions?.length || !sessionExercises.includes(entry)) return;
+  const prevSessionIds = prevSessions.map(s => s.id);
 
-  const { data: prevSets } = await sb.from('sets').select('weight, reps, duration, value2').eq('exercise_id', exRow.id).in('session_id', prevSessions.map(s => s.id)).order('id', { ascending: false }).limit(1);
-  if (!prevSets?.length || !sessionExercises.includes(entry)) return;
+  if (setInputType(category) === 'weight') {
+    const { data: bestSets } = await sb.from('sets').select('weight').eq('exercise_id', exRow.id).in('session_id', prevSessionIds).order('weight', { ascending: false }).limit(1);
+    if (!sessionExercises.includes(entry)) return;
+    if (bestSets?.length) entry.prevBest = bestSets[0].weight;
+  }
+
+  const { data: prevSets } = await sb.from('sets').select('weight, reps, duration, value2').eq('exercise_id', exRow.id).in('session_id', prevSessionIds.slice(0, 20)).order('id', { ascending: false }).limit(1);
+  if (!sessionExercises.includes(entry)) return;
+  if (!prevSets?.length) { renderExerciseBlocks(); return; }
 
   entry.prevWeight   = prevSets[0].weight;
   entry.prevReps     = prevSets[0].reps;
@@ -793,6 +801,31 @@ async function loadDateRecord(date) {
 
   renderExerciseBlocks();
   updateSaveButton();
+  loadPersonalBests(date, user.id);
+}
+
+async function loadPersonalBests(date, userId) {
+  const targets = sessionExercises.filter(ex => ex.id && setInputType(ex.category) === 'weight');
+  if (!targets.length) return;
+
+  const { data: prevSessions } = await sb.from('sessions').select('id').eq('user_id', userId).lt('date', date);
+  if (!prevSessions?.length) return;
+
+  const { data: prevSets } = await sb.from('sets')
+    .select('exercise_id, weight')
+    .in('session_id', prevSessions.map(s => s.id))
+    .in('exercise_id', targets.map(ex => ex.id));
+
+  const best = {};
+  (prevSets || []).forEach(s => {
+    if (s.weight != null && (best[s.exercise_id] == null || s.weight > best[s.exercise_id])) best[s.exercise_id] = s.weight;
+  });
+
+  let changed = false;
+  targets.forEach(ex => {
+    if (best[ex.id] != null && sessionExercises.includes(ex)) { ex.prevBest = best[ex.id]; changed = true; }
+  });
+  if (changed) renderExerciseBlocks();
 }
 
 function updateSaveButton() {
@@ -893,6 +926,13 @@ async function saveExercise() {
     );
   }
 
+  const personalBests = exercises.flatMap(ex => {
+    if (setInputType(ex.category) !== 'weight' || ex.prevBest == null) return [];
+    const top = ex.sets.reduce((a, b) => (b.weight || 0) > (a.weight || 0) ? b : a, ex.sets[0]);
+    if (!(top.weight > ex.prevBest)) return [];
+    return [{ name: ex.name, weight: top.weight, reps: top.reps, prev: ex.prevBest }];
+  });
+
   sessionExercises = [];
   existingSessionIds = [];
   await loadDateRecord(date);
@@ -901,7 +941,40 @@ async function saveExercise() {
   renderCalendarGrid();
   btn.disabled = false;
   updateSaveButton();
+
+  if (personalBests.length) showPersonalBests(personalBests);
 }
+
+// ── Personal best celebration ──
+const modalPr = document.getElementById('modal-pr');
+
+function showPersonalBests(bests) {
+  document.getElementById('pr-list').innerHTML = bests.map(b => `
+    <li>
+      <span class="pr-ex-name">${b.name}</span>
+      <span class="pr-ex-detail">${b.weight}${currentUnit} × ${b.reps} reps</span>
+      <span class="pr-ex-prev">prev ${b.prev}${currentUnit}</span>
+    </li>
+  `).join('');
+
+  const colors = ['#3ea8ff', '#eab308', '#ef4444', '#22c55e', '#ec4899'];
+  document.getElementById('pr-confetti').innerHTML = Array.from({ length: 16 }, (_, i) => {
+    const left  = Math.round(Math.random() * 92) + 4;
+    const delay = (Math.random() * 1.4).toFixed(2);
+    const dur   = (1.2 + Math.random() * 0.9).toFixed(2);
+    return `<span style="left:${left}%;background:${colors[i % colors.length]};animation-delay:${delay}s;animation-duration:${dur}s"></span>`;
+  }).join('');
+
+  modalPr.classList.remove('hidden');
+}
+
+function closePersonalBests() {
+  modalPr.classList.add('hidden');
+  document.getElementById('pr-confetti').innerHTML = '';
+}
+
+document.getElementById('btn-pr-close').addEventListener('click', closePersonalBests);
+document.getElementById('modal-pr-overlay').addEventListener('click', closePersonalBests);
 
 // ── Auto-save body weight ──
 async function saveBodyWeight(date, val) {
