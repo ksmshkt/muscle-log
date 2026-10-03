@@ -85,7 +85,10 @@ function openLogModal(date) {
   document.getElementById('modal-log').classList.remove('hidden');
 }
 
-function closeLogModal() {
+function closeLogModal(force = false) {
+  if (!force && sessionChanged && !confirm('You have unsaved changes. Close without saving?')) return;
+
+  sessionChanged = false;
   const bwVal  = parseFloat(inputBodyWeight.value);
   const bwDate = logDateInput.value || today();
   saveBodyWeight(bwDate, bwVal);
@@ -376,6 +379,8 @@ function renderExerciseList() {
   });
 }
 
+const TRASH_ICON = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M10 11v6M14 11v6"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>`;
+
 // ── Exercise blocks ──
 async function addExercise(name, category, id = null, cardioUnit = null) {
   const entry = { name, category, id, cardioUnit, sets: [], isEditing: true, isExpanded: true, prevWeight: null, prevReps: null, prevDuration: null, prevValue2: null, prevBest: null };
@@ -418,6 +423,7 @@ function removeExercise(index) {
 
 function addSet(ei, weight, reps, duration = null, value2 = null) {
   sessionExercises[ei].sets.push({ weight, reps, duration, value2 });
+  sessionChanged = true;
   renderExerciseBlocks();
 }
 
@@ -477,23 +483,25 @@ function renderExerciseBlocks() {
           <div class="exercise-category">${catLabel}</div>
         </div>
         <div class="exercise-header-btns">
-          ${editing ? `
-            <div class="set-input-inline">${inputRowHTML}</div>
-            <button class="btn-add-set" data-ei="${i}">+</button>
-          ` : `<button class="btn-edit-exercise" data-i="${i}" aria-label="Edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button>`}
-          <button class="btn-remove-exercise" data-i="${i}">✕</button>
+          ${editing
+            ? `<button class="btn-done-exercise" data-i="${i}" aria-label="Done editing"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></button>`
+            : `<button class="btn-edit-exercise" data-i="${i}" aria-label="Edit"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button>`}
+          <button class="btn-remove-exercise" data-i="${i}" aria-label="Remove exercise">${TRASH_ICON}</button>
         </div>
       </div>
+      ${editing ? `
+      <div class="set-input-row">
+        <div class="set-input-inline">${inputRowHTML}</div>
+        <button class="btn-add-set" data-ei="${i}">+</button>
+      </div>
+      ` : ''}
       ${expanded && ex.sets.length ? `
       <div class="set-list">
         ${ex.sets.map((s, j) => `
           <div class="set-row">
             <span class="set-number">Set ${j + 1}</span>
             <span class="set-detail">${setDetailHTML(s)}</span>
-            ${editing ? `
-              <button class="btn-copy-set" data-ei="${i}" data-si="${j}" title="Copy">⎘</button>
-              <button class="btn-delete-set" data-ei="${i}" data-si="${j}">✕</button>
-            ` : ''}
+            ${editing ? `<button class="btn-delete-set" data-ei="${i}" data-si="${j}" aria-label="Delete set">${TRASH_ICON}</button>` : ''}
           </div>
         `).join('')}
       </div>
@@ -507,6 +515,14 @@ function renderExerciseBlocks() {
       if (e.target.closest('button')) return;
       const i = +hdr.dataset.i;
       sessionExercises[i].isExpanded = !sessionExercises[i].isExpanded;
+      renderExerciseBlocks();
+    });
+  });
+
+  exerciseBlocksEl.querySelectorAll('.btn-done-exercise').forEach(btn => {
+    btn.addEventListener('click', () => {
+      sessionExercises[+btn.dataset.i].isEditing = false;
+      sessionExercises[+btn.dataset.i].isExpanded = true;
       renderExerciseBlocks();
     });
   });
@@ -589,13 +605,6 @@ function renderExerciseBlocks() {
       const durEl   = exerciseBlocksEl.querySelector(`.input-duration[data-ei="${ei}"]`);
       const duration = parseInt(durEl.value) || parseInt(durEl.placeholder) || 0;
       if (duration) addSet(ei, null, null, duration, readCardioValue2(ei));
-    });
-  });
-
-  exerciseBlocksEl.querySelectorAll('.btn-copy-set').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const { weight, reps, duration, value2 } = sessionExercises[+btn.dataset.ei].sets[+btn.dataset.si];
-      addSet(+btn.dataset.ei, weight, reps, duration, value2);
     });
   });
 
@@ -842,9 +851,8 @@ function updateSaveButton() {
 }
 
 async function changeLogDate(newDate) {
-  if (sessionExercises.some(ex => ex.isEditing)) {
-    if (!confirm('Load records for this date? Unsaved changes will be lost.')) return;
-  }
+  if (sessionChanged && !confirm('You have unsaved changes. Switch date without saving?')) return;
+  sessionChanged = false;
   logDateInput.value = newDate;
   sessionExercises = [];
   existingSessionIds = [];
@@ -1571,8 +1579,8 @@ mainEl.addEventListener('touchend', e => {
 }, { passive: true });
 
 // ── Log modal ──
-document.getElementById('modal-log-close').addEventListener('click', closeLogModal);
-document.getElementById('modal-log-overlay').addEventListener('click', closeLogModal);
+document.getElementById('modal-log-close').addEventListener('click', () => closeLogModal());
+document.getElementById('modal-log-overlay').addEventListener('click', () => closeLogModal());
 
 document.getElementById('modal-date-prev').addEventListener('click', () => {
   const d = new Date(logDateInput.value || today());
@@ -1823,7 +1831,7 @@ document.getElementById('btn-delete-log').addEventListener('click', async () => 
   const date = logDateInput.value || today();
   if (!confirm(`Delete all data for ${date}?`)) return;
   const ids = [...existingSessionIds];
-  closeLogModal();
+  closeLogModal(true);
   await deleteHistoryByDate(date, ids);
 });
 

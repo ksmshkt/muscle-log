@@ -945,10 +945,11 @@ main {
 /* ── Set list ── */
 .set-list { margin: 10px 0 8px; }
 
+/* Fixed side columns keep the value centered whether or not the delete button is shown. */
 .set-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 40px;
   align-items: center;
-  gap: 8px;
   padding: 7px 0;
   border-bottom: 1px solid var(--border);
   font-size: 14px;
@@ -962,22 +963,29 @@ main {
   min-width: 42px;
 }
 
-.set-detail { flex: 1; }
-
-.btn-copy-set,
-.btn-delete-set {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 15px;
-  color: var(--text-sub);
-  padding: 2px 5px;
-  transition: color 0.15s;
-  line-height: 1;
+.set-detail {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
-.btn-copy-set:hover  { color: var(--primary); }
-.btn-delete-set:hover { color: var(--danger); }
+.btn-delete-set {
+  width: 40px;
+  height: 40px;
+  margin: -8px 0;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text);
+  transition: color 0.15s, background 0.15s;
+}
+
+.btn-delete-set:hover { color: var(--danger); background: rgba(239, 68, 68, 0.08); }
 
 /* ── Set input inline (in header) ── */
 .set-input-inline {
@@ -989,11 +997,11 @@ main {
 }
 
 .set-input-inline input {
-  width: 52px;
-  padding: 5px 4px;
+  width: 58px;
+  padding: 3px 6px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 15px;
   text-align: center;
   outline: none;
   transition: border-color 0.2s;
@@ -1356,26 +1364,46 @@ main {
   min-width: 0;
 }
 
+/* While editing, the input row sits under the name so long exercise names keep a full line. */
+.set-input-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 8px;
+}
+
 .exercise-name {
   font-size: 15px;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .exercise-category {
   font-size: 12px;
   color: var(--text-sub);
   margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .btn-remove-exercise {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
-  font-size: 16px;
-  color: var(--text-sub);
+  color: var(--text);
   cursor: pointer;
-  padding: 4px 6px;
+  padding: 0;
   line-height: 1;
-  border-radius: 4px;
+  border-radius: 8px;
   transition: color 0.15s, background 0.15s;
 }
 
@@ -1390,7 +1418,8 @@ main {
   gap: 6px;
 }
 
-.btn-edit-exercise {
+.btn-edit-exercise,
+.btn-done-exercise {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1404,13 +1433,15 @@ main {
   transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
 }
 
-.btn-edit-exercise:hover {
+.btn-edit-exercise:hover,
+.btn-done-exercise:hover {
   background: rgba(62, 168, 255, 0.14);
   box-shadow: 0 0 8px rgba(62, 168, 255, 0.25);
   transform: translateY(-1px);
 }
 
-.btn-edit-exercise:active {
+.btn-edit-exercise:active,
+.btn-done-exercise:active {
   transform: scale(0.96);
 }
 
@@ -1754,6 +1785,7 @@ main {
   #page-charts .period-tabs {
     margin-bottom: 0;
   }
+
 
   #modal-log .modal-content > .modal-log-top,
   #modal-log .modal-content > .log-toolbar,
