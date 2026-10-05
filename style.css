@@ -1463,9 +1463,17 @@ main {
   animation: slideUp 0.2s ease-out;
 }
 
+/* Floats clear of all four edges: the calendar stays visible above, and the gap
+   below sits where a thumb can reach to dismiss. */
 #modal-log .modal-content {
-  height: 68dvh;
+  width: calc(100% - 20px);
+  margin: 92px 10px calc(30px + env(safe-area-inset-bottom, 0px));
+  align-self: stretch;
+  height: auto;
   max-height: none;
+  border-radius: 16px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+  animation: modalIn 0.15s ease-out;
   display: flex;
   flex-direction: column;
   overflow: hidden;
