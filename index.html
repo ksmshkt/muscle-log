@@ -124,16 +124,33 @@
           </svg>
         </button>
         <div class="account-menu hidden" id="account-menu">
-          <div class="account-menu-section">
+          <div class="account-menu-unit">
             <div class="account-menu-label">Unit</div>
             <div class="unit-toggle" id="account-unit-toggle">
               <button type="button" class="unit-btn" data-unit="kg">kg</button>
               <button type="button" class="unit-btn" data-unit="lbs">lbs</button>
             </div>
           </div>
-          <button class="btn-signout" id="btn-signout">Sign Out</button>
-          <a class="link-btn" href="https://docs.google.com/forms/d/e/1FAIpQLSc1TdKcJTbV9tmTCYxbJn0Nm4obf0r_-M8r82R--CF3ukheBw/viewform" target="_blank" rel="noopener">Send Feedback</a>
-          <button class="link-btn danger-link" id="btn-delete-account">Delete My Data</button>
+
+          <div class="account-menu-divider"></div>
+
+          <a class="account-menu-item" href="https://docs.google.com/forms/d/e/1FAIpQLSc1TdKcJTbV9tmTCYxbJn0Nm4obf0r_-M8r82R--CF3ukheBw/viewform" target="_blank" rel="noopener">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Send Feedback
+            <svg class="account-menu-ext" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7"/><path d="M8 7h9v9"/></svg>
+          </a>
+
+          <button class="account-menu-item" id="btn-signout">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+            Sign Out
+          </button>
+
+          <div class="account-menu-divider"></div>
+
+          <button class="account-menu-item danger" id="btn-delete-account">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M10 11v6M14 11v6"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>
+            Delete My Data
+          </button>
         </div>
       </div>
     </header>
