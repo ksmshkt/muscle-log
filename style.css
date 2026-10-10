@@ -951,14 +951,14 @@ main {
 }
 
 /* ── Set list ── */
-.set-list { margin: 10px 0 8px; }
+.set-list { margin: 6px 0 0; }
 
 /* Fixed side columns keep the value centered whether or not the delete button is shown. */
 .set-row {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr) 40px;
   align-items: center;
-  padding: 7px 0;
+  padding: 5px 0;
   border-bottom: 1px solid var(--border);
   font-size: 14px;
 }
@@ -975,6 +975,16 @@ main {
   text-align: center;
   font-variant-numeric: tabular-nums;
 }
+
+.set-detail-split {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 6px;
+}
+
+.set-detail-split .sd-left  { text-align: right; }
+.set-detail-split .sd-right { text-align: left; }
+.sd-ghost { visibility: hidden; }
 
 .btn-delete-set {
   width: 40px;
@@ -1020,8 +1030,8 @@ main {
 .set-sep { font-size: 14px; }
 
 .btn-add-set {
-  width: 30px;
-  height: 30px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   background: var(--primary-d);
   color: #fff;
@@ -1341,8 +1351,8 @@ main {
   border-left-width: 3px;
   border-left-color: var(--cat-color, var(--primary));
   border-radius: var(--radius);
-  padding: 14px 16px;
-  margin-bottom: 12px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
@@ -1361,9 +1371,13 @@ main {
   gap: 8px;
 }
 
+/* Name, category and set count share one line; the name gives way first. */
 .exercise-info {
   flex-shrink: 1;
   min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
 /* While editing, the input row sits under the name so long exercise names keep a full line. */
@@ -1372,10 +1386,12 @@ main {
   align-items: center;
   justify-content: center;
   gap: 14px;
-  margin-top: 8px;
+  /* Header buttons overhang the name line by 9px; this leaves 4px clear below them. */
+  margin-top: 13px;
 }
 
 .exercise-name {
+  min-width: 0;
   font-size: 15px;
   font-weight: 600;
   white-space: nowrap;
@@ -1384,12 +1400,10 @@ main {
 }
 
 .exercise-category {
+  flex-shrink: 0;
   font-size: 12px;
   color: var(--text-sub);
-  margin-top: 2px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .btn-remove-exercise {
@@ -1414,10 +1428,12 @@ main {
   background: rgba(239, 68, 68, 0.08);
 }
 
+/* Negative margins keep the 36px tap targets without making the header row 36px tall. */
 .exercise-header-btns {
   display: flex;
   align-items: center;
   gap: 6px;
+  margin: -9px 0;
 }
 
 .btn-edit-exercise,
@@ -1651,6 +1667,19 @@ main {
   color: var(--text);
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+/* Unit sits beside the name so the Cardio tab doesn't add a row and shift the modal. */
+.custom-exercise-inputs {
+  display: flex;
+  gap: 8px;
+}
+
+.custom-exercise-inputs #custom-exercise-input { flex: 1; min-width: 0; }
+
+.custom-exercise-inputs #custom-exercise-unit-input {
+  width: 120px;
+  flex-shrink: 0;
 }
 
 .custom-exercise-form input:focus {

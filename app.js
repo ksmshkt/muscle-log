@@ -64,7 +64,7 @@ function today() {
 }
 
 function formatDateLabel(dateStr) {
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric' });
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' });
 }
 
 function showApp() {
@@ -86,7 +86,7 @@ function openLogModal(date) {
 }
 
 function closeLogModal(force = false) {
-  if (!force && sessionChanged && !confirm('You have unsaved changes. Close without saving?')) return;
+  if (!force && sessionChanged && !confirm('保存していない変更があります。保存せずに閉じますか?')) return;
 
   sessionChanged = false;
   const bwVal  = parseFloat(inputBodyWeight.value);
@@ -107,6 +107,18 @@ function closeLogModal(force = false) {
   updateSaveButton();
 }
 
+// Supabase returns English messages; map the common ones and fall back to the original.
+function authErrorMessage(error) {
+  const msg = error?.message || '';
+  if (/invalid login credentials/i.test(msg)) return 'メールアドレスかパスワードが正しくありません。';
+  if (/email not confirmed/i.test(msg)) return 'メールアドレスの確認が済んでいません。届いたメールのリンクを開いてください。';
+  if (/already registered/i.test(msg)) return 'このメールアドレスはすでに登録されています。';
+  if (/password should be at least/i.test(msg)) return 'パスワードは6文字以上にしてください。';
+  if (/invalid format|valid email/i.test(msg)) return 'メールアドレスの形式が正しくありません。';
+  if (/rate limit|too many/i.test(msg)) return '試行回数が多すぎます。しばらく時間をおいてから試してください。';
+  return msg || 'エラーが発生しました。もう一度試してください。';
+}
+
 function setError(msg) {
   authError.textContent = msg;
   authError.classList.toggle('hidden', !msg);
@@ -118,7 +130,7 @@ authModeTabs.forEach(tab => {
     authMode = tab.dataset.mode;
     authModeTabs.forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
-    authSubmit.textContent = authMode === 'signin' ? 'Sign In' : 'Sign Up';
+    authSubmit.textContent = authMode === 'signin' ? 'ログイン' : '登録する';
     document.getElementById('auth-unit-group').classList.toggle('hidden', authMode !== 'signup');
     btnForgotPassword.classList.toggle('hidden', authMode !== 'signin');
     setError('');
@@ -154,7 +166,7 @@ forgotForm.addEventListener('submit', async e => {
   });
 
   forgotSubmit.disabled = false;
-  setForgotError(error ? error.message : 'Check your email for a reset link.');
+  setForgotError(error ? authErrorMessage(error) : '再設定用のリンクをメールで送りました。');
 });
 
 // ── Sign-up unit selection ──
@@ -215,12 +227,12 @@ resetPasswordForm.addEventListener('submit', async e => {
   resetPasswordSubmit.disabled = false;
 
   if (error) {
-    setResetPasswordError(error.message);
+    setResetPasswordError(authErrorMessage(error));
     return;
   }
 
   resetPasswordInput.value = '';
-  alert('Password updated.');
+  alert('パスワードを変更しました。');
   const { data: { user } } = await sb.auth.getUser();
   currentUnit = user.user_metadata?.unit || 'kg';
   applyUnit();
@@ -244,9 +256,9 @@ authForm.addEventListener('submit', async e => {
   authSubmit.disabled = false;
 
   if (error) {
-    setError(error.message);
+    setError(authErrorMessage(error));
   } else if (authMode === 'signup') {
-    setError('Check your email to confirm your account.');
+    setError('確認メールを送りました。メール内のリンクを開いて登録を完了してください。');
   }
 });
 
@@ -269,6 +281,26 @@ const CARDIO_UNITS = { Running: 'km/h', Bike: 'Level' };
 function resolveCardioUnit(name, category, dbUnit) {
   return category === 'Cardio' ? (CARDIO_UNITS[name] || dbUnit || 'Value') : undefined;
 }
+
+// Stored data keeps the English keys; these only change what is shown.
+const CATEGORY_LABELS = {
+  Chest: '胸', Back: '背中', Legs: '脚', Shoulders: '肩', Arms: '腕', Core: '腹筋', Cardio: '有酸素',
+};
+const EXERCISE_LABELS = {
+  'Bench Press': 'ベンチプレス', 'Dumbbell Fly': 'ダンベルフライ', 'Pec Deck': 'ペックデック',
+  'Deadlift': 'デッドリフト', 'Lat Pulldown': 'ラットプルダウン', 'Bent Over Row': 'ベントオーバーロウ',
+  'Squat': 'スクワット', 'Leg Press': 'レッグプレス', 'Leg Curl': 'レッグカール',
+  'Leg Extension': 'レッグエクステンション', 'Calf Raise': 'カーフレイズ', 'Hip Adduction': 'ヒップアダクション',
+  'Shoulder Press': 'ショルダープレス', 'Lateral Raise': 'サイドレイズ',
+  'Barbell Curl': 'バーベルカール', 'Triceps Pressdown': 'トライセプスプレスダウン',
+  'Decline Sit-up': 'デクラインシットアップ', 'Crunch': 'クランチ', 'Hanging Leg Raise': 'ハンギングレッグレイズ',
+  'Running': 'ランニング', 'Bike': 'バイク',
+};
+const UNIT_LABELS = { Level: 'レベル', Value: '値' };
+
+function categoryLabel(cat) { return CATEGORY_LABELS[cat] || cat; }
+function exerciseLabel(name) { return EXERCISE_LABELS[name] || name; }
+function unitLabel(unit) { return UNIT_LABELS[unit] || unit; }
 
 let customExercises = [];
 let sessionExercises = [];
@@ -335,7 +367,7 @@ modalOverlay.addEventListener('click', closeModal);
 // ── Category tabs ──
 function renderCategoryTabs() {
   categoryTabsEl.innerHTML = CATEGORIES.map(cat => `
-    <button class="category-tab${cat === activeCategory ? ' active' : ''}" data-cat="${cat}">${cat}</button>
+    <button class="category-tab${cat === activeCategory ? ' active' : ''}" data-cat="${cat}">${categoryLabel(cat)}</button>
   `).join('');
 
   categoryTabsEl.querySelectorAll('.category-tab').forEach(btn => {
@@ -359,10 +391,10 @@ function renderExerciseList() {
   exerciseListEl.innerHTML = all.length
     ? all.map(ex => `
         <li data-name="${ex.name}" data-cat="${ex.category}"${ex.id ? ` data-id="${ex.id}"` : ''}${ex.cardio_unit ? ` data-unit="${ex.cardio_unit}"` : ''}>
-          <span class="ex-name">${ex.name}</span>
+          <span class="ex-name">${exerciseLabel(ex.name)}</span>
           ${ex.id ? `<button class="btn-delete-custom" data-id="${ex.id}" data-name="${ex.name}">✕</button>` : ''}
         </li>`).join('')
-    : '<li style="color:var(--text-sub);cursor:default">No exercises</li>';
+    : '<li style="color:var(--text-sub);cursor:default">種目がありません</li>';
 
   exerciseListEl.querySelectorAll('li[data-name]').forEach(li => {
     li.addEventListener('click', () => {
@@ -441,7 +473,7 @@ function removeSet(ei, si) {
 
 function renderExerciseBlocks() {
   if (!sessionExercises.length) {
-    exerciseBlocksEl.innerHTML = '<p class="placeholder">No exercises yet.<br>Tap "+ Add Exercise" to start.</p>';
+    exerciseBlocksEl.innerHTML = '<p class="placeholder">まだ種目がありません。<br>「+ 種目を追加」から始めましょう。</p>';
     return;
   }
 
@@ -451,12 +483,20 @@ function renderExerciseBlocks() {
     const expanded = editing || ex.isExpanded !== false;
     const setCount = ex.sets.length;
 
-    const cardioUnit = ex.cardioUnit || 'Value';
+    const cardioUnit = unitLabel(ex.cardioUnit || 'Value');
 
+    // Two-part values pivot on the separator so it lines up down the list regardless of digit count.
+    const splitDetail = (left, sep, right) =>
+      `<span class="sd-left">${left}</span><span class="sd-sep">${sep}</span><span class="sd-right">${right}</span>`;
     const setDetailHTML = (s) => {
-      if (itype === 'cardio') return `${s.duration} min${s.value2 != null ? ` · ${s.value2} ${cardioUnit}` : ''}`;
-      if (itype === 'core')   return `${s.reps} reps`;
-      return `${s.weight} ${currentUnit} × ${s.reps} reps`;
+      if (itype === 'cardio') {
+        return s.value2 != null ? splitDetail(`${s.duration}分`, '·', `${s.value2} ${cardioUnit}`) : `${s.duration}分`;
+      }
+      if (itype === 'core') return `${s.reps}回`;
+      // Hidden padding keeps ones digits aligned: ".0" after whole weights, a leading "0" before 1-digit reps.
+      const weightPad = Number.isInteger(s.weight) ? '<span class="sd-ghost">.0</span>' : '';
+      const repsPad   = s.reps < 10 ? '<span class="sd-ghost">0</span>' : '';
+      return splitDetail(`${s.weight}${weightPad}${currentUnit}`, '×', `${repsPad}${s.reps}回`);
     };
 
     const lastSet  = ex.sets.length ? ex.sets[ex.sets.length - 1] : null;
@@ -466,27 +506,27 @@ function renderExerciseBlocks() {
     const phValue2   = lastSet?.value2   ?? ex.prevValue2   ?? 0;
 
     const inputRowHTML = itype === 'cardio'
-      ? `<input type="number" class="input-duration" data-ei="${i}" placeholder="${phDuration}" min="0" step="1" /><span>min</span><input type="number" class="input-cardio-value" data-ei="${i}" placeholder="${phValue2}" min="0" step="0.1" /><span>${cardioUnit}</span>`
+      ? `<input type="number" class="input-duration" data-ei="${i}" placeholder="${phDuration}" min="0" step="1" /><span>分</span><input type="number" class="input-cardio-value" data-ei="${i}" placeholder="${phValue2}" min="0" step="0.1" /><span>${cardioUnit}</span>`
       : itype === 'core'
-      ? `<input type="number" class="input-reps" data-ei="${i}" placeholder="${phReps}" min="1" step="1" /><span>reps</span>`
-      : `<input type="number" class="input-weight" data-ei="${i}" placeholder="${phWeight}" min="0" step="0.5" /><span>${currentUnit}</span><span class="set-sep">×</span><input type="number" class="input-reps" data-ei="${i}" placeholder="${phReps}" min="1" step="1" /><span>reps</span>`;
+      ? `<input type="number" class="input-reps" data-ei="${i}" placeholder="${phReps}" min="1" step="1" /><span>回</span>`
+      : `<input type="number" class="input-weight" data-ei="${i}" placeholder="${phWeight}" min="0" step="0.5" /><span>${currentUnit}</span><span class="set-sep">×</span><input type="number" class="input-reps" data-ei="${i}" placeholder="${phReps}" min="1" step="1" /><span>回</span>`;
 
     const catLabel = (!editing && !expanded && setCount)
-      ? `${ex.category} · ${setCount} set${setCount !== 1 ? 's' : ''}`
-      : ex.category;
+      ? `${categoryLabel(ex.category)} · ${setCount}セット`
+      : categoryLabel(ex.category);
 
     return `
     <div class="exercise-block" data-cat="${ex.category}">
       <div class="exercise-block-header${!editing ? ' accordion-header' : ''}" data-i="${i}">
         <div class="exercise-info">
-          <div class="exercise-name">${ex.name}</div>
+          <div class="exercise-name">${exerciseLabel(ex.name)}</div>
           <div class="exercise-category">${catLabel}</div>
         </div>
         <div class="exercise-header-btns">
           ${editing
-            ? `<button class="btn-done-exercise" data-i="${i}" aria-label="Done editing"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></button>`
-            : `<button class="btn-edit-exercise" data-i="${i}" aria-label="Edit"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button>`}
-          <button class="btn-remove-exercise" data-i="${i}" aria-label="Remove exercise">${TRASH_ICON}</button>
+            ? `<button class="btn-done-exercise" data-i="${i}" aria-label="編集を終える"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></button>`
+            : `<button class="btn-edit-exercise" data-i="${i}" aria-label="編集"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg></button>`}
+          <button class="btn-remove-exercise" data-i="${i}" aria-label="種目を削除">${TRASH_ICON}</button>
         </div>
       </div>
       ${editing ? `
@@ -499,9 +539,9 @@ function renderExerciseBlocks() {
       <div class="set-list">
         ${ex.sets.map((s, j) => `
           <div class="set-row">
-            <span class="set-number">Set ${j + 1}</span>
-            <span class="set-detail">${setDetailHTML(s)}</span>
-            ${editing ? `<button class="btn-delete-set" data-ei="${i}" data-si="${j}" aria-label="Delete set">${TRASH_ICON}</button>` : ''}
+            <span class="set-number">${j + 1}</span>
+            <span class="set-detail${itype === 'core' || (itype === 'cardio' && s.value2 == null) ? '' : ' set-detail-split'}">${setDetailHTML(s)}</span>
+            ${editing ? `<button class="btn-delete-set" data-ei="${i}" data-si="${j}" aria-label="セットを削除">${TRASH_ICON}</button>` : ''}
           </div>
         `).join('')}
       </div>
@@ -680,8 +720,8 @@ async function changeAccountUnit(newUnit) {
     const totalCount = setsToConvert.length + bwToConvert.length;
 
     const msg = totalCount > 0
-      ? `Convert all your data (${totalCount} record${totalCount !== 1 ? 's' : ''}) to ${newUnit}?`
-      : `Switch unit to ${newUnit}?`;
+      ? `すべての記録(${totalCount}件)を${newUnit}に変換しますか?`
+      : `単位を${newUnit}に変更しますか?`;
     if (!confirm(msg)) return;
 
     await Promise.all([
@@ -706,7 +746,7 @@ async function changeAccountUnit(newUnit) {
     }
   } catch (err) {
     console.error('changeAccountUnit:', err);
-    alert('Failed to update unit. Please try again.');
+    alert('単位を変更できませんでした。もう一度試してください。');
   } finally {
     toggleButtons.forEach(b => b.disabled = false);
   }
@@ -719,10 +759,10 @@ async function deleteAllUserData() {
   if (!user) return;
 
   const confirmed = confirm(
-    'This will permanently delete all your workout logs and body weight history. This cannot be undone.\n\n' +
-    'Your account itself will not be deleted — you can sign back in afterward to an empty account.\n\n' +
-    'Consider exporting your data first (Charts tab).\n\n' +
-    'Continue?'
+    'トレーニングと体重の記録をすべて削除します。元に戻すことはできません。\n\n' +
+    'アカウント自体は削除されません。あとでログインすると、空のアカウントとして使えます。\n\n' +
+    '必要なら、先にデータを書き出してください(グラフのタブから)。\n\n' +
+    '削除しますか?'
   );
   if (!confirmed) return;
 
@@ -743,11 +783,11 @@ async function deleteAllUserData() {
       sb.from('body_weights').delete().eq('user_id', user.id),
     ]);
 
-    alert('All your data has been deleted.');
+    alert('すべての記録を削除しました。');
     await sb.auth.signOut();
   } catch (err) {
     console.error('deleteAllUserData:', err);
-    alert('Failed to delete your data. Please try again.');
+    alert('記録を削除できませんでした。もう一度試してください。');
   } finally {
     btn.disabled = false;
   }
@@ -844,14 +884,14 @@ function updateSaveButton() {
     : sessionExercises.some(ex => ex.sets.length > 0);
 
   const saveBtn = document.getElementById('btn-save-exercise');
-  saveBtn.textContent = hasData ? 'Update' : 'Save';
+  saveBtn.textContent = hasData ? '更新' : '保存';
   saveBtn.disabled = !canSave;
   document.getElementById('btn-delete-log').classList.toggle('hidden', !hasData);
   document.getElementById('btn-share-log').classList.toggle('hidden', !hasData);
 }
 
 async function changeLogDate(newDate) {
-  if (sessionChanged && !confirm('You have unsaved changes. Switch date without saving?')) return;
+  if (sessionChanged && !confirm('保存していない変更があります。保存せずに日付を切り替えますか?')) return;
   sessionChanged = false;
   logDateInput.value = newDate;
   sessionExercises = [];
@@ -873,7 +913,7 @@ async function saveExercise() {
 
   const btn = document.getElementById('btn-save-exercise');
   btn.disabled = true;
-  btn.textContent = 'Saving...';
+  btn.textContent = '保存中…';
 
   const date = logDateInput.value || today();
 
@@ -892,7 +932,7 @@ async function saveExercise() {
 
   if (sessionError) {
     btn.disabled = false;
-    btn.textContent = 'Save Exercise';
+    btn.textContent = '保存';
     return;
   }
 
@@ -959,9 +999,9 @@ const modalPr = document.getElementById('modal-pr');
 function showPersonalBests(bests) {
   document.getElementById('pr-list').innerHTML = bests.map(b => `
     <li>
-      <span class="pr-ex-name">${b.name}</span>
-      <span class="pr-ex-detail">${b.weight}${currentUnit} × ${b.reps} reps</span>
-      <span class="pr-ex-prev">prev ${b.prev}${currentUnit}</span>
+      <span class="pr-ex-name">${exerciseLabel(b.name)}</span>
+      <span class="pr-ex-detail">${b.weight}${currentUnit} × ${b.reps}回</span>
+      <span class="pr-ex-prev">これまで ${b.prev}${currentUnit}</span>
     </li>
   `).join('');
 
@@ -1027,7 +1067,7 @@ inputBodyWeight.addEventListener('blur', async () => {
   const date = logDateInput.value || today();
   // A number input reports an empty value for unparsable text, so badInput tells the two apart.
   if (inputBodyWeight.validity.badInput) {
-    showBwStatus('Enter a number', true);
+    showBwStatus('数値を入力してください', true);
     return;
   }
 
@@ -1037,7 +1077,7 @@ inputBodyWeight.addEventListener('blur', async () => {
   if (raw === '') {
     const removed = await removeBodyWeight(date);
     if (removed) bwSavedValue = '';
-    showBwStatus(removed ? 'Saved' : "Couldn't save", !removed);
+    showBwStatus(removed ? '保存しました' : '保存できませんでした', !removed);
     return;
   }
 
@@ -1045,16 +1085,16 @@ inputBodyWeight.addEventListener('blur', async () => {
   if (!val) return;
   const saved = await saveBodyWeight(date, val);
   if (saved) bwSavedValue = raw;
-  showBwStatus(saved ? 'Saved' : "Couldn't save", !saved);
+  showBwStatus(saved ? '保存しました' : '保存できませんでした', !saved);
 });
 
 // ── Save custom exercise ──
 btnSaveCustom.addEventListener('click', async () => {
   const name = customInput.value.trim();
-  if (!name) { setCustomExerciseError('Enter an exercise name.'); return; }
+  if (!name) { setCustomExerciseError('種目名を入力してください。'); return; }
 
   const cardioUnit = activeCategory === 'Cardio' ? customUnitInput.value.trim() : null;
-  if (activeCategory === 'Cardio' && !cardioUnit) { setCustomExerciseError('Enter a unit for this exercise.'); return; }
+  if (activeCategory === 'Cardio' && !cardioUnit) { setCustomExerciseError('この種目の単位を入力してください。'); return; }
 
   setCustomExerciseError('');
 
@@ -1073,12 +1113,12 @@ btnSaveCustom.addEventListener('click', async () => {
     customUnitInput.value = '';
     renderExerciseList();
   } else {
-    setCustomExerciseError('Could not add exercise. Try again.');
+    setCustomExerciseError('種目を追加できませんでした。もう一度試してください。');
   }
 });
 
 async function deleteCustomExercise(id, name) {
-  if (!confirm(`Delete "${name}"?\nAll logged sets for this exercise will also be deleted.`)) return;
+  if (!confirm(`「${name}」を削除しますか?\nこの種目で記録したセットもすべて削除されます。`)) return;
   const { error } = await sb.from('exercises').delete().eq('id', id);
   if (error) return;
   customExercises = customExercises.filter(ex => ex.id !== id);
@@ -1157,14 +1197,14 @@ function renderCalendarGrid() {
   const year  = calendarYear;
   const month = calendarMonth;
   document.getElementById('cal-month-label').textContent =
-    new Date(year, month, 1).toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+    new Date(year, month, 1).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long' });
 
   const firstDow    = (new Date(year, month, 1).getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const todayStr    = today();
   const selectedDate = logDateInput.value;
 
-  let html = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+  let html = ['月', '火', '水', '木', '金', '土', '日']
     .map(d => `<div class="cal-header">${d}</div>`).join('');
 
   for (let i = 0; i < firstDow; i++) html += `<div class="cal-day cal-empty"></div>`;
@@ -1250,14 +1290,14 @@ async function loadCharts() {
 
   const CAT_COLORS = { Chest:'#ef4444', Back:'#22c55e', Legs:'#8b5cf6', Shoulders:'#f97316', Arms:'#ec4899', Core:'#eab308', Cardio:'#06b6d4' };
   const list = document.getElementById('exercise-select-list');
-  list.innerHTML = `<li class="ex-select-item" data-id="">— Select —</li>` +
+  list.innerHTML = `<li class="ex-select-item" data-id="">種目を選択</li>` +
     recordedExercises.map(ex => {
       const color = CAT_COLORS[ex.category] || 'transparent';
-      return `<li class="ex-select-item" data-id="${ex.id}" data-cat="${ex.category || ''}" data-name="${ex.name}" style="border-left-color:${color}">${ex.name}<span class="ex-select-cat">${ex.category || ''}</span></li>`;
+      return `<li class="ex-select-item" data-id="${ex.id}" data-cat="${ex.category || ''}" data-name="${ex.name}" style="border-left-color:${color}">${exerciseLabel(ex.name)}<span class="ex-select-cat">${ex.category ? categoryLabel(ex.category) : ''}</span></li>`;
     }).join('');
   const found = currentExerciseId && recordedExercises.find(ex => String(ex.id) === String(currentExerciseId));
-  if (found) { setExSelectLabel(found.name, CAT_COLORS[found.category] || ''); currentExerciseCategory = found.category || null; }
-  else { setExSelectLabel('— Select —', ''); currentExerciseId = null; currentExerciseCategory = null; }
+  if (found) { setExSelectLabel(exerciseLabel(found.name), CAT_COLORS[found.category] || ''); currentExerciseCategory = found.category || null; }
+  else { setExSelectLabel('種目を選択', ''); currentExerciseId = null; currentExerciseCategory = null; }
 
   renderBodyWeightChart();
   renderFrequencyChart();
@@ -1359,7 +1399,7 @@ function renderFrequencyChart() {
 
   const labels = allWeeks.map(w => {
     const d = new Date(w + 'T00:00:00');
-    return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+    return d.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
   });
   const data = allWeeks.map(w => weekMap[w] || 0);
 
@@ -1416,7 +1456,7 @@ function renderExerciseChart() {
   if (!filtered.length) {
     wrap.classList.add('hidden');
     ph.classList.remove('hidden');
-    ph.textContent = currentExerciseSets.length ? 'No data for this period.' : 'No data yet.';
+    ph.textContent = currentExerciseSets.length ? 'この期間の記録はありません。' : 'まだ記録がありません。';
     return;
   }
   wrap.classList.remove('hidden');
@@ -1434,10 +1474,10 @@ function renderExerciseChart() {
     yLabel = currentUnit;
   } else if (hasDuration) {
     filtered.forEach(s => { if (!byDate[s.date] || s.duration > byDate[s.date]) byDate[s.date] = s.duration || 0; });
-    yLabel = 'min';
+    yLabel = '分';
   } else {
     filtered.forEach(s => { if (!byDate[s.date] || s.reps > byDate[s.date]) byDate[s.date] = s.reps || 0; });
-    yLabel = 'reps';
+    yLabel = '回';
   }
   const labels = Object.keys(byDate).sort();
 
@@ -1469,17 +1509,17 @@ function renderStats() {
       document.getElementById('stat-max-weight').textContent = `${max} ${currentUnit}`;
     } else if (hasDuration) {
       const max = Math.max(...currentExerciseSets.map(s => s.duration || 0));
-      document.getElementById('stat-max-weight').textContent = `${max} min`;
+      document.getElementById('stat-max-weight').textContent = `${max}分`;
     } else {
       const max = Math.max(...currentExerciseSets.map(s => s.reps || 0));
-      document.getElementById('stat-max-weight').textContent = `${max} reps`;
+      document.getElementById('stat-max-weight').textContent = `${max}回`;
     }
   } else {
     document.getElementById('stat-max-weight').textContent = '—';
   }
 
   const recent = filterByPeriod(allBodyWeights, 'date');
-  const periodLabel = { month: 'Avg (Mo)', year: 'Avg (Yr)', all: 'Avg (All)' }[currentPeriod];
+  const periodLabel = { month: '平均(30日)', year: '平均(1年)', all: '平均(全期間)' }[currentPeriod];
   document.getElementById('stat-avg-bw-label').textContent = periodLabel;
   if (recent.length) {
     const avg = (recent.reduce((s, b) => s + convertWeight(b.weight, b.unit, currentUnit), 0) / recent.length).toFixed(1);
@@ -1525,7 +1565,7 @@ document.getElementById('exercise-select-list').addEventListener('click', e => {
   const color = item.style.borderLeftColor;
   currentExerciseId       = id || null;
   currentExerciseCategory = id ? (item.dataset.cat || null) : null;
-  setExSelectLabel(id ? (item.dataset.name || item.textContent) : item.textContent, id ? color : '');
+  setExSelectLabel(id ? exerciseLabel(item.dataset.name) : item.textContent, id ? color : '');
   if (id) {
     loadExerciseChart(id);
   } else {
@@ -1534,7 +1574,7 @@ document.getElementById('exercise-select-list').addEventListener('click', e => {
     document.getElementById('ex-chart-wrap').classList.add('hidden');
     const ph = document.getElementById('ex-placeholder');
     ph.classList.remove('hidden');
-    ph.textContent = 'Select an exercise above.';
+    ph.textContent = '上で種目を選んでください。';
     renderStats();
   }
 });
@@ -1640,11 +1680,11 @@ async function executeCopy(sourceDate) {
   if (sessionExercises.length > 0 || existingSessionIds.length > 0) {
     const srcLabel = formatDateLabel(sourceDate);
     const dstLabel = formatDateLabel(currentDate);
-    if (!confirm(`Copy exercises from ${srcLabel} to ${dstLabel}?\nThis will overwrite the current exercise list.`)) return;
+    if (!confirm(`${srcLabel}の種目を${dstLabel}にコピーしますか?\n今の種目リストは上書きされます。`)) return;
   }
 
   const found = await loadExercisesFromDate(sourceDate);
-  if (!found) alert(`No records found for ${formatDateLabel(sourceDate)}.`);
+  if (!found) alert(`${formatDateLabel(sourceDate)}の記録は見つかりませんでした。`);
 }
 
 document.getElementById('copy-date-input').addEventListener('change', e => executeCopy(e.target.value));
@@ -1667,16 +1707,16 @@ const CATEGORY_COLORS = {
 function getShareHighlight(ex) {
   if (ex.category === 'Cardio') {
     const set = ex.sets.reduce((a, b) => (b.duration || 0) > (a.duration || 0) ? b : a, ex.sets[0]);
-    const unit = ex.cardioUnit || 'Value';
-    const primary = set.value2 != null ? `${set.duration}min / ${set.value2}${unit}` : `${set.duration}min`;
-    return { name: ex.name, category: ex.category, primary, sub: ex.sets.length > 1 ? `${ex.sets.length} sets` : '' };
+    const unit = unitLabel(ex.cardioUnit || 'Value');
+    const primary = set.value2 != null ? `${set.duration}分 / ${set.value2}${unit}` : `${set.duration}分`;
+    return { name: exerciseLabel(ex.name), category: ex.category, primary, sub: ex.sets.length > 1 ? `${ex.sets.length}セット` : '' };
   }
   if (setInputType(ex.category) === 'core') {
     const set = ex.sets.reduce((a, b) => (b.reps || 0) > (a.reps || 0) ? b : a, ex.sets[0]);
-    return { name: ex.name, category: ex.category, primary: `${set.reps} reps`, sub: ex.sets.length > 1 ? `${ex.sets.length} sets` : '' };
+    return { name: exerciseLabel(ex.name), category: ex.category, primary: `${set.reps}回`, sub: ex.sets.length > 1 ? `${ex.sets.length}セット` : '' };
   }
   const set = ex.sets.reduce((a, b) => (b.weight || 0) > (a.weight || 0) ? b : a, ex.sets[0]);
-  return { name: ex.name, category: ex.category, primary: `${set.weight}${currentUnit} × ${set.reps} reps`, sub: ex.sets.length > 1 ? `${ex.sets.length} sets` : '' };
+  return { name: exerciseLabel(ex.name), category: ex.category, primary: `${set.weight}${currentUnit} × ${set.reps}回`, sub: ex.sets.length > 1 ? `${ex.sets.length}セット` : '' };
 }
 
 function loadImage(src) {
@@ -1689,7 +1729,7 @@ function loadImage(src) {
 }
 
 async function buildShareCard(date, highlights) {
-  const font = (size, weight = '') => `${weight} ${size}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`.trim();
+  const font = (size, weight = '') => `${weight} ${size}px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Segoe UI", Roboto, sans-serif`.trim();
 
   const rows = highlights.slice(0, 5);
   const overflow = highlights.length - rows.length;
@@ -1773,7 +1813,7 @@ async function buildShareCard(date, highlights) {
     ctx.textAlign = 'left';
     ctx.fillStyle = '#999999';
     ctx.font = `italic ${font(18)}`;
-    ctx.fillText(`+${overflow} more`, cardX + 24 + 18, rowY + rowH / 2 + 6);
+    ctx.fillText(`ほか${overflow}種目`, cardX + 24 + 18, rowY + rowH / 2 + 6);
   }
 
   ctx.textAlign = 'center';
@@ -1794,7 +1834,7 @@ document.getElementById('btn-share-log').addEventListener('click', async () => {
     canvas = await buildShareCard(date, highlights);
   } catch (err) {
     console.error('buildShareCard failed:', err);
-    alert('Could not create the share image. Please try again.');
+    alert('シェア用の画像を作れませんでした。もう一度試してください。');
     return;
   }
   canvas.toBlob(async (blob) => {
@@ -1829,7 +1869,7 @@ document.getElementById('btn-share-log').addEventListener('click', async () => {
 // ── Delete log ──
 document.getElementById('btn-delete-log').addEventListener('click', async () => {
   const date = logDateInput.value || today();
-  if (!confirm(`Delete all data for ${date}?`)) return;
+  if (!confirm(`${formatDateLabel(date)}の記録をすべて削除しますか?`)) return;
   const ids = [...existingSessionIds];
   closeLogModal(true);
   await deleteHistoryByDate(date, ids);
@@ -1936,14 +1976,14 @@ async function exportUserData() {
 
     const rows = buildExportRows({ sessions, exercises: exercises || [], sets: sets || [], bodyWeights });
     if (!rows.length) {
-      alert('No data to export for the selected period.');
+      alert('選んだ期間に書き出せる記録がありません。');
       return;
     }
 
     downloadTextFile(`muscle-log-export-${currentPeriod}-${today()}.csv`, rowsToCsv(rows));
   } catch (err) {
     console.error('exportUserData:', err);
-    alert('Export failed. Please try again.');
+    alert('書き出しに失敗しました。もう一度試してください。');
   } finally {
     btn.disabled = false;
   }
