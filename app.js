@@ -1654,15 +1654,95 @@ document.getElementById('modal-log').addEventListener('touchend', e => {
 }, { passive: true });
 
 // ── Copy from date ──
-document.getElementById('btn-copy-from-date').addEventListener('click', () => {
+// Only days that actually have a session are offered, so a copy can't come up empty.
+const COPY_PAGE = 10;
+let copyCandidates = [];
+let copyShown = 0;
+let copySelected = null;
+const copySummaries = new Map();
+
+function renderCopyList() {
+  const list = document.getElementById('copy-day-list');
+  list.innerHTML = copyCandidates.length
+    ? copyCandidates.slice(0, copyShown).map(d => `
+        <button type="button" class="copy-day${d === copySelected ? ' selected' : ''}" data-date="${d}">
+          <span class="copy-day-date">${formatDateLabel(d)}</span>
+          <span class="copy-day-summary">${copySummaries.get(d) ?? '…'}</span>
+        </button>`).join('')
+    : '<p class="copy-day-empty">コピーできる過去の記録がありません</p>';
+
+  document.getElementById('btn-copy-more').classList.toggle('hidden', copyShown >= copyCandidates.length);
+  const confirmBtn = document.getElementById('btn-confirm-copy');
+  confirmBtn.classList.toggle('hidden', !copyCandidates.length);
+  confirmBtn.disabled = !copySelected;
+}
+
+async function loadCopySummaries(dates) {
+  const missing = dates.filter(d => !copySummaries.has(d));
+  if (!missing.length) return;
+  const { data: { user } } = await sb.auth.getUser();
+  if (!user) return;
+
+  const { data: sessions } = await sb.from('sessions').select('id, date').eq('user_id', user.id).in('date', missing);
+  const dateBySession = Object.fromEntries((sessions || []).map(s => [s.id, s.date]));
+  const sessionIds = Object.keys(dateBySession);
+
+  const [{ data: sets }, { data: exercises }] = await Promise.all([
+    sessionIds.length
+      ? sb.from('sets').select('session_id, exercise_id').in('session_id', sessionIds)
+      : Promise.resolve({ data: [] }),
+    sb.from('exercises').select('id, category').eq('user_id', user.id),
+  ]);
+
+  const categoryById = Object.fromEntries((exercises || []).map(e => [e.id, e.category]));
+  const exercisesByDate = {};
+  (sets || []).forEach(s => {
+    const d = dateBySession[s.session_id];
+    if (!exercisesByDate[d]) exercisesByDate[d] = new Set();
+    exercisesByDate[d].add(s.exercise_id);
+  });
+
+  missing.forEach(d => {
+    const ids = [...(exercisesByDate[d] || [])];
+    const cats = [...new Set(ids.map(id => categoryById[id]).filter(Boolean))]
+      .sort((a, b) => CATEGORIES.indexOf(a) - CATEGORIES.indexOf(b))
+      .map(categoryLabel);
+    copySummaries.set(d, ids.length ? `${cats.join('・')} · ${ids.length}種目` : '記録なし');
+  });
+}
+
+document.getElementById('btn-copy-from-date').addEventListener('click', async () => {
   const row = document.getElementById('copy-date-row');
   row.classList.toggle('hidden');
-  if (!row.classList.contains('hidden')) {
-    const currentDate = logDateInput.value || today();
-    const prevDate = [...calSessionDates].filter(d => d < currentDate).sort().at(-1) ?? '';
-    document.getElementById('copy-date-input').value = prevDate;
-    document.getElementById('copy-date-input').focus();
-  }
+  if (row.classList.contains('hidden')) return;
+
+  const currentDate = logDateInput.value || today();
+  document.getElementById('copy-date-hint').textContent =
+    `選んだ日の種目とセットを、${formatDateLabel(currentDate)}にコピーします`;
+
+  copyCandidates = [...calSessionDates].filter(d => d < currentDate).sort().reverse();
+  copyShown = Math.min(COPY_PAGE, copyCandidates.length);
+  copySelected = copyCandidates[0] ?? null;
+  copySummaries.clear();
+  renderCopyList();
+
+  await loadCopySummaries(copyCandidates.slice(0, copyShown));
+  if (!row.classList.contains('hidden')) renderCopyList();
+});
+
+document.getElementById('copy-day-list').addEventListener('click', e => {
+  const item = e.target.closest('.copy-day');
+  if (!item) return;
+  copySelected = item.dataset.date;
+  renderCopyList();
+});
+
+document.getElementById('btn-copy-more').addEventListener('click', async () => {
+  const from = copyShown;
+  copyShown = Math.min(copyShown + COPY_PAGE, copyCandidates.length);
+  renderCopyList();
+  await loadCopySummaries(copyCandidates.slice(from, copyShown));
+  renderCopyList();
 });
 
 document.getElementById('btn-cancel-copy').addEventListener('click', () => {
@@ -1672,7 +1752,6 @@ document.getElementById('btn-cancel-copy').addEventListener('click', () => {
 async function executeCopy(sourceDate) {
   if (!sourceDate) return;
   document.getElementById('copy-date-row').classList.add('hidden');
-  document.getElementById('copy-date-input').value = '';
 
   const currentDate = logDateInput.value || today();
   if (sourceDate === currentDate) return;
@@ -1687,11 +1766,7 @@ async function executeCopy(sourceDate) {
   if (!found) alert(`${formatDateLabel(sourceDate)}の記録は見つかりませんでした。`);
 }
 
-document.getElementById('copy-date-input').addEventListener('change', e => executeCopy(e.target.value));
-document.getElementById('copy-date-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') executeCopy(e.target.value);
-});
-document.getElementById('btn-confirm-copy').addEventListener('click', () => executeCopy(document.getElementById('copy-date-input').value));
+document.getElementById('btn-confirm-copy').addEventListener('click', () => executeCopy(copySelected));
 
 // ── Share log ──
 function formatDateShort(dateStr) {

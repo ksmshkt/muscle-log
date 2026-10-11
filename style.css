@@ -848,76 +848,126 @@ main {
 
 .copy-date-row {
   position: absolute;
-  top: 32px;
+  top: 40px;
   right: 0;
   z-index: 10;
+  width: 272px;
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  gap: 6px;
-  padding: 8px;
+  gap: 10px;
+  padding: 12px 14px 14px;
   background: var(--surface);
-  border-radius: 6px;
-  border: 1px solid var(--border, rgba(255,255,255,0.15));
-  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
 }
 
-.copy-date-hint {
-  max-width: 190px;
-  font-size: 11px;
-  line-height: 1.3;
-  color: var(--text-sub);
-}
-
-.copy-date-controls {
+.copy-date-head {
   display: flex;
   align-items: center;
-  gap: 4px;
+  justify-content: space-between;
 }
 
-.copy-date-row input[type="date"] {
-  width: 112px;
-  padding: 3px 4px;
-  border-radius: 4px;
-  border: 1px solid var(--border, rgba(255,255,255,0.15));
-  background: var(--bg);
-  color: var(--text);
-  font-size: 11px;
-  min-width: 0;
+.copy-date-title {
+  font-size: 14px;
+  font-weight: 700;
 }
 
-.copy-date-confirm {
-  background: none;
+.copy-date-close {
+  width: 32px;
+  height: 32px;
+  margin: -6px -8px -6px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border: none;
-  color: var(--accent);
-  font-size: 16px;
-  cursor: pointer;
-  padding: 4px 6px;
-  line-height: 1;
-  border-radius: 4px;
-  transition: color 0.15s, background 0.15s;
-}
-
-.copy-date-confirm:hover {
-  color: var(--accent);
-  background: var(--bg);
-}
-
-.copy-date-cancel {
+  border-radius: 8px;
   background: none;
-  border: none;
   color: var(--text-sub);
-  font-size: 16px;
   cursor: pointer;
-  padding: 4px 6px;
-  line-height: 1;
-  border-radius: 4px;
-  transition: color 0.15s, background 0.15s;
 }
 
-.copy-date-cancel:hover {
-  color: var(--danger);
-  background: rgba(239, 68, 68, 0.08);
+.copy-date-close:hover { background: rgba(0, 0, 0, 0.05); }
+
+.copy-date-hint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-sub);
+}
+
+.copy-day-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 232px;
+  overflow-y: auto;
+  margin: 0 -6px;
+}
+
+.copy-day {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 8px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font-family: inherit;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.copy-day:hover { background: rgba(0, 0, 0, 0.04); }
+.copy-day.selected { background: rgba(62, 168, 255, 0.12); }
+.copy-day.selected .copy-day-date { color: var(--primary-d); }
+
+.copy-day-date {
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.copy-day-summary {
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-sub);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.copy-day-more {
+  align-self: center;
+  margin-top: -4px;
+  padding: 4px 8px;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary-d);
+  cursor: pointer;
+}
+
+.copy-day-empty {
+  padding: 12px 0;
+  font-size: 13px;
+  color: var(--text-sub);
+  text-align: center;
+}
+
+.copy-date-row .copy-date-confirm {
+  align-self: center;
+  width: auto;
+  min-width: 120px;
+  margin-top: 0;
+  padding: 7px 24px;
+  font-size: 13px;
+  border-radius: 8px;
 }
 
 /* ── Unit toggle ── */

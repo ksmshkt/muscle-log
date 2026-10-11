@@ -271,12 +271,16 @@
               </svg>
             </button>
             <div id="copy-date-row" class="copy-date-row hidden">
-              <p class="copy-date-hint">過去の日付の種目を、この日にまとめてコピーします</p>
-              <div class="copy-date-controls">
-                <input type="date" id="copy-date-input" />
-                <button class="copy-date-confirm" id="btn-confirm-copy">✓</button>
-                <button class="copy-date-cancel" id="btn-cancel-copy">✕</button>
+              <div class="copy-date-head">
+                <span class="copy-date-title">過去の日付からコピー</span>
+                <button class="copy-date-close" id="btn-cancel-copy" aria-label="閉じる">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
               </div>
+              <p class="copy-date-hint" id="copy-date-hint">選んだ日の種目とセットを、この日にコピーします</p>
+              <div class="copy-day-list" id="copy-day-list"></div>
+              <button type="button" class="copy-day-more hidden" id="btn-copy-more">もっと見る</button>
+              <button class="btn btn-primary copy-date-confirm" id="btn-confirm-copy" disabled>コピーする</button>
             </div>
             <button class="icon-btn-sm hidden" id="btn-share-log" aria-label="この日をシェア" title="この日をシェア">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
