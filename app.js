@@ -268,7 +268,7 @@ btnSignout.addEventListener('click', async () => {
 });
 
 const PRESETS = {
-  Chest:     ['Bench Press', 'Dumbbell Fly', 'Pec Deck'],
+  Chest:     ['Bench Press', 'Chest Press', 'Dumbbell Fly', 'Pec Deck'],
   Back:      ['Deadlift', 'Lat Pulldown', 'Bent Over Row'],
   Legs:      ['Squat', 'Leg Press', 'Leg Curl', 'Leg Extension', 'Calf Raise', 'Hip Adduction'],
   Shoulders: ['Shoulder Press', 'Lateral Raise'],
@@ -287,7 +287,7 @@ const CATEGORY_LABELS = {
   Chest: '胸', Back: '背中', Legs: '脚', Shoulders: '肩', Arms: '腕', Core: '腹筋', Cardio: '有酸素',
 };
 const EXERCISE_LABELS = {
-  'Bench Press': 'ベンチプレス', 'Dumbbell Fly': 'ダンベルフライ', 'Pec Deck': 'ペックデック',
+  'Bench Press': 'ベンチプレス', 'Chest Press': 'チェストプレス', 'Dumbbell Fly': 'ダンベルフライ', 'Pec Deck': 'ペックデック',
   'Deadlift': 'デッドリフト', 'Lat Pulldown': 'ラットプルダウン', 'Bent Over Row': 'ベントオーバーロウ',
   'Squat': 'スクワット', 'Leg Press': 'レッグプレス', 'Leg Curl': 'レッグカール',
   'Leg Extension': 'レッグエクステンション', 'Calf Raise': 'カーフレイズ', 'Hip Adduction': 'ヒップアダクション',
@@ -385,7 +385,9 @@ function renderCategoryTabs() {
 // ── Exercise list ──
 function renderExerciseList() {
   const presets = (PRESETS[activeCategory] || []).map(name => ({ name, category: activeCategory, id: null, cardio_unit: CARDIO_UNITS[name] || null }));
-  const customs = customExercises.filter(e => e.category === activeCategory);
+  // A custom exercise that now matches a preset name would otherwise show up twice; records are matched by name, so history carries over.
+  const presetNames = new Set(PRESETS[activeCategory] || []);
+  const customs = customExercises.filter(e => e.category === activeCategory && !presetNames.has(e.name));
   const all = [...presets, ...customs];
 
   exerciseListEl.innerHTML = all.length
@@ -485,18 +487,32 @@ function renderExerciseBlocks() {
 
     const cardioUnit = unitLabel(ex.cardioUnit || 'Value');
 
-    // Two-part values pivot on the separator so it lines up down the list regardless of digit count.
+    // Every set renders as left · separator · right so values line up down the list for all exercise types.
+    // Hidden padding is added only when an exercise mixes digit counts or decimals, so uniform sets stay tight.
+    const ghost = (text) => `<span class="sd-ghost">${text}</span>`;
+    const mixedDecimals = (key) => ex.sets.some(s => s[key] != null && !Number.isInteger(s[key]));
+    const mixedTwoDigits = (key) => ex.sets.some(s => s[key] >= 10) && ex.sets.some(s => s[key] != null && s[key] < 10);
+    const weightHasDecimal = mixedDecimals('weight');
+    const repsMixed     = mixedTwoDigits('reps');
+    const durationMixed = mixedTwoDigits('duration');
+    const value2Mixed   = mixedTwoDigits('value2');
+    const value2HasDecimal = mixedDecimals('value2');
+    const leadPad = (n, mixed) => (mixed && n < 10 ? ghost('0') : '');
     const splitDetail = (left, sep, right) =>
       `<span class="sd-left">${left}</span><span class="sd-sep">${sep}</span><span class="sd-right">${right}</span>`;
     const setDetailHTML = (s) => {
+      // Cardio and core read as one centered string; padding keeps every row in a card the same width.
       if (itype === 'cardio') {
-        return s.value2 != null ? splitDetail(`${s.duration}分`, '·', `${s.value2} ${cardioUnit}`) : `${s.duration}分`;
+        const duration = `${leadPad(s.duration, durationMixed)}${s.duration}分`;
+        if (s.value2 == null) return duration;
+        const v2Pad = value2HasDecimal && Number.isInteger(s.value2) ? ghost('.0') : '';
+        return `${duration} / ${leadPad(s.value2, value2Mixed)}${s.value2}${cardioUnit}${v2Pad}`;
       }
-      if (itype === 'core') return `${s.reps}回`;
-      // Hidden padding keeps ones digits aligned: ".0" after whole weights, a leading "0" before 1-digit reps.
-      const weightPad = Number.isInteger(s.weight) ? '<span class="sd-ghost">.0</span>' : '';
-      const repsPad   = s.reps < 10 ? '<span class="sd-ghost">0</span>' : '';
-      return splitDetail(`${s.weight}${weightPad}${currentUnit}`, '×', `${repsPad}${s.reps}回`);
+      const reps = `${leadPad(s.reps, repsMixed)}${s.reps}回`;
+      if (itype === 'core') return reps;
+      // The ".0" goes after the unit so whole numbers don't show a gap between the number and "kg".
+      const weightPad = weightHasDecimal && Number.isInteger(s.weight) ? ghost('.0') : '';
+      return splitDetail(`${s.weight}${currentUnit}${weightPad}`, '×', reps);
     };
 
     const lastSet  = ex.sets.length ? ex.sets[ex.sets.length - 1] : null;
@@ -505,11 +521,12 @@ function renderExerciseBlocks() {
     const phDuration = lastSet?.duration ?? ex.prevDuration ?? 0;
     const phValue2   = lastSet?.value2   ?? ex.prevValue2   ?? 0;
 
+    // Input row mirrors the set rows (left · separator · right) so its separator sits over theirs.
     const inputRowHTML = itype === 'cardio'
-      ? `<input type="number" class="input-duration" data-ei="${i}" placeholder="${phDuration}" min="0" step="1" /><span>分</span><input type="number" class="input-cardio-value" data-ei="${i}" placeholder="${phValue2}" min="0" step="0.1" /><span>${cardioUnit}</span>`
+      ? `<div class="si-l"><input type="number" class="input-duration" data-ei="${i}" placeholder="${phDuration}" min="0" step="1" /><span class="si-unit">分</span></div><span class="set-sep">/</span><div class="si-r"><input type="number" class="input-cardio-value" data-ei="${i}" placeholder="${phValue2}" min="0" step="0.1" /><span class="si-unit">${cardioUnit}</span></div>`
       : itype === 'core'
-      ? `<input type="number" class="input-reps" data-ei="${i}" placeholder="${phReps}" min="1" step="1" /><span>回</span>`
-      : `<input type="number" class="input-weight" data-ei="${i}" placeholder="${phWeight}" min="0" step="0.5" /><span>${currentUnit}</span><span class="set-sep">×</span><input type="number" class="input-reps" data-ei="${i}" placeholder="${phReps}" min="1" step="1" /><span>回</span>`;
+      ? `<div class="si-c"><input type="number" class="input-reps" data-ei="${i}" placeholder="${phReps}" min="1" step="1" /><span class="si-unit">回</span></div>`
+      : `<div class="si-l"><input type="number" class="input-weight" data-ei="${i}" placeholder="${phWeight}" min="0" step="0.5" /><span class="si-unit">${currentUnit}</span></div><span class="set-sep">×</span><div class="si-r"><input type="number" class="input-reps" data-ei="${i}" placeholder="${phReps}" min="1" step="1" /><span class="si-unit">回</span></div>`;
 
     const catLabel = (!editing && !expanded && setCount)
       ? `${categoryLabel(ex.category)} · ${setCount}セット`
@@ -531,7 +548,8 @@ function renderExerciseBlocks() {
       </div>
       ${editing ? `
       <div class="set-input-row">
-        <div class="set-input-inline">${inputRowHTML}</div>
+        <span></span>
+        <div class="set-input-inline${itype === 'core' ? ' set-input-center' : ''}">${inputRowHTML}</div>
         <button class="btn-add-set" data-ei="${i}">+</button>
       </div>
       ` : ''}
@@ -540,7 +558,7 @@ function renderExerciseBlocks() {
         ${ex.sets.map((s, j) => `
           <div class="set-row">
             <span class="set-number">${j + 1}</span>
-            <span class="set-detail${itype === 'core' || (itype === 'cardio' && s.value2 == null) ? '' : ' set-detail-split'}">${setDetailHTML(s)}</span>
+            <span class="set-detail${itype === 'weight' ? ' set-detail-split' : ''}">${setDetailHTML(s)}</span>
             ${editing ? `<button class="btn-delete-set" data-ei="${i}" data-si="${j}" aria-label="セットを削除">${TRASH_ICON}</button>` : ''}
           </div>
         `).join('')}
