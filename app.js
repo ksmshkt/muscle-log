@@ -202,6 +202,9 @@ sb.auth.onAuthStateChange((_event, session) => {
     return;
   }
   if (session) {
+    // Supabase re-announces the session (SIGNED_IN / TOKEN_REFRESHED) when the app returns from the
+    // background; re-running showApp() then would wipe the in-progress log while its modal stays open.
+    if (!app.classList.contains('hidden')) return;
     currentUnit = session.user.user_metadata?.unit || 'kg';
     applyUnit();
     syncAccountUnitToggle();
@@ -922,9 +925,36 @@ async function changeLogDate(newDate) {
 // ── Save exercise ──
 document.getElementById('btn-save-exercise').addEventListener('click', saveExercise);
 
+// Updating a saved day after removing every exercise clears that day's training (body weight stays).
+async function clearDayTraining() {
+  const date = logDateInput.value || today();
+  const ids  = [...existingSessionIds];
+  const btn  = document.getElementById('btn-save-exercise');
+  btn.disabled = true;
+
+  const { error: setsError } = await sb.from('sets').delete().in('session_id', ids);
+  const { error: sessionsError } = setsError ? { error: null } : await sb.from('sessions').delete().in('id', ids);
+  if (setsError || sessionsError) {
+    console.error('clearDayTraining:', setsError || sessionsError);
+    alert('記録を削除できませんでした。もう一度試してください。');
+    updateSaveButton();
+    return;
+  }
+
+  calSessionDates.delete(date);
+  if (!inputBodyWeight.value.trim() && !bwSavedValue) calAllDates.delete(date);
+  renderCalendarGrid();
+  sessionExercises = [];
+  existingSessionIds = [];
+  await loadDateRecord(date);
+}
+
 async function saveExercise() {
   const exercises = sessionExercises.filter(ex => ex.sets.length > 0);
-  if (!exercises.length) return;
+  if (!exercises.length) {
+    if (existingSessionIds.length) await clearDayTraining();
+    return;
+  }
 
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return;
