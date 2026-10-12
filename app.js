@@ -1841,29 +1841,40 @@ async function executeCopy(sourceDate) {
 document.getElementById('btn-confirm-copy').addEventListener('click', () => executeCopy(copySelected));
 
 // ── Share log ──
-function formatDateShort(dateStr) {
-  const [y, m, d] = dateStr.split('-');
-  return `${y}/${Number(m)}/${Number(d)}`;
-}
-
 const CATEGORY_COLORS = {
   Chest: '#ef4444', Back: '#22c55e', Legs: '#8b5cf6', Shoulders: '#f97316',
   Arms: '#ec4899', Core: '#eab308', Cardio: '#06b6d4',
 };
 
 function getShareHighlight(ex) {
+  const sub = ex.sets.length > 1 ? `${ex.sets.length}セット` : '';
   if (ex.category === 'Cardio') {
     const set = ex.sets.reduce((a, b) => (b.duration || 0) > (a.duration || 0) ? b : a, ex.sets[0]);
     const unit = unitLabel(ex.cardioUnit || 'Value');
-    const primary = set.value2 != null ? `${set.duration}分 / ${set.value2}${unit}` : `${set.duration}分`;
-    return { name: exerciseLabel(ex.name), category: ex.category, primary, sub: ex.sets.length > 1 ? `${ex.sets.length}セット` : '' };
+    const parts = set.value2 != null
+      ? { left: `${set.duration}分`, sep: '/', right: `${set.value2}${unit}` }
+      : { left: `${set.duration}分`, sep: '', right: '' };
+    return { name: exerciseLabel(ex.name), category: ex.category, ...parts, sub, pr: false };
   }
   if (setInputType(ex.category) === 'core') {
     const set = ex.sets.reduce((a, b) => (b.reps || 0) > (a.reps || 0) ? b : a, ex.sets[0]);
-    return { name: exerciseLabel(ex.name), category: ex.category, primary: `${set.reps}回`, sub: ex.sets.length > 1 ? `${ex.sets.length}セット` : '' };
+    return { name: exerciseLabel(ex.name), category: ex.category, left: '', sep: '', right: `${set.reps}回`, sub, pr: false };
   }
   const set = ex.sets.reduce((a, b) => (b.weight || 0) > (a.weight || 0) ? b : a, ex.sets[0]);
-  return { name: exerciseLabel(ex.name), category: ex.category, primary: `${set.weight}${currentUnit} × ${set.reps}回`, sub: ex.sets.length > 1 ? `${ex.sets.length}セット` : '' };
+  const pr = ex.prevBest != null && set.weight > ex.prevBest;
+  return { name: exerciseLabel(ex.name), category: ex.category, left: `${set.weight}${currentUnit}`, sep: '×', right: `${set.reps}回`, sub, pr };
+}
+
+// Day totals for the card chips and the caption. Volume counts weighted sets only (weight × reps).
+function buildShareSummary(exercises) {
+  const categories = [...new Set(exercises.map(ex => ex.category))]
+    .sort((a, b) => CATEGORIES.indexOf(a) - CATEGORIES.indexOf(b))
+    .map(categoryLabel);
+  const setCount = exercises.reduce((n, ex) => n + ex.sets.length, 0);
+  const volume = Math.round(exercises
+    .filter(ex => setInputType(ex.category) === 'weight')
+    .reduce((sum, ex) => sum + ex.sets.reduce((t, set) => t + (set.weight || 0) * (set.reps || 0), 0), 0));
+  return { exerciseCount: exercises.length, setCount, volume, categories };
 }
 
 function loadImage(src) {
@@ -1875,110 +1886,250 @@ function loadImage(src) {
   });
 }
 
-async function buildShareCard(date, highlights) {
+const SHARE_URL = 'https://muscle-log-lilac.vercel.app/welcome/';
+
+async function buildShareCard(date, highlights, summary) {
   const font = (size, weight = '') => `${weight} ${size}px -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Segoe UI", Roboto, sans-serif`.trim();
-
-  const rows = highlights.slice(0, 5);
-  const overflow = highlights.length - rows.length;
-  const rowCount = rows.length + (overflow > 0 ? 1 : 0);
-  const innerPad = 20;
-  const rowH = 56;
-
-  const margin = 56;
-  const cardW = 760;
-  const cardH = innerPad * 2 + rowH * rowCount;
-  const iconSize = 52;
-  const maxRowCount = 6; // 5 highlighted rows + 1 possible overflow row
-  const maxCardH = innerPad * 2 + rowH * maxRowCount;
-  const headerH = margin + iconSize + 60;
+  const C = {
+    bg: '#f5f5f5', surface: '#ffffff', border: '#e5e5e5',
+    text: '#333333', sub: '#666666', mute: '#999999',
+    brand: '#3ea8ff', brandDark: '#1d8fe8', gold: '#a16207', goldBg: 'rgba(234, 179, 8, 0.16)',
+  };
+  const F = {
+    brand: font(22, 'bold'), date: font(38, 'bold'),
+    chipStrong: font(16, 'bold'), chipSmall: font(13),
+    name: font(22, 'bold'), value: font(22, 'bold'), pr: font(13, 'bold'), sub: font(14), more: font(16),
+    foot: font(15), footBold: font(15, 'bold'),
+  };
 
   // Fixed canvas size/ratio so X doesn't crop the image differently per post.
-  const canvasW = cardW + margin * 2;
-  const canvasH = headerH + maxCardH + 60;
-  const cardX = margin;
-  const cardY = headerH + (maxCardH - cardH) / 2;
+  const W = 872;
+  const H = 604;
+  const MARGIN = 48;
+  const TOP = 30;
+  const FOOT_H = 48;
 
   const canvas = document.createElement('canvas');
-  canvas.width = canvasW;
-  canvas.height = canvasH;
+  canvas.width = W;
+  canvas.height = H;
   const ctx = canvas.getContext('2d');
+  ctx.textBaseline = 'middle';
 
-  const grad = ctx.createLinearGradient(0, 0, canvasW, canvasH);
-  grad.addColorStop(0, '#3ea8ff');
-  grad.addColorStop(1, '#1565c0');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvasW, canvasH);
+  const measure = (text, f) => { ctx.font = f; return ctx.measureText(text).width; };
+  const fitText = (text, maxW) => {
+    if (ctx.measureText(text).width <= maxW) return text;
+    let t = text;
+    while (t.length > 1 && ctx.measureText(`${t}…`).width > maxW) t = t.slice(0, -1);
+    return `${t}…`;
+  };
 
+  ctx.fillStyle = C.bg;
+  ctx.fillRect(0, 0, W, H);
   const icon = await loadImage('icon-512.png');
-  ctx.drawImage(icon, margin, margin, iconSize, iconSize);
 
+  // ── Measure: the block is laid out as narrow as its content allows, then scaled up to fill the canvas.
+  const rows = highlights.slice(0, 5);
+  const rest = highlights.slice(5);
+  const restLabel = rest.length === 1 ? `ほか1種目(${rest[0].name})` : `ほか${rest.length}種目`;
+  const rowH = 52;
+  const listPadY = 12;
+  const rowPadX = 24;
+  const barW = 5;
+  const barGap = 14;
+  const valueGap = 8;
+  const nameValueGap = 40;
+  const dateLabel = formatDateLabel(date);
+
+  const chips = [
+    [{ text: String(summary.exerciseCount), strong: true }, { text: '種目' }],
+    [{ text: String(summary.setCount), strong: true }, { text: 'セット' }],
+  ];
+  if (summary.volume > 0) {
+    chips.push([{ text: '総重量' }, { text: `${summary.volume.toLocaleString('ja-JP')}${currentUnit}`, strong: true }]);
+  }
+  const partFont = (part) => (part.strong ? F.chipStrong : F.chipSmall);
+  const chipSizes = chips.map(parts => {
+    const widths = parts.map(part => measure(part.text, partFont(part)));
+    return { parts, widths, w: widths.reduce((x, y) => x + y, 0) + 6 * (parts.length - 1) + 28 };
+  });
+  const chipsW = chipSizes.reduce((x, c) => x + c.w, 0) + 8 * (chipSizes.length - 1);
+  const headerW = measure(dateLabel, F.date) + 16 + chipsW;
+
+  const sepW = measure('×', F.value);
+  const maxLeftW = Math.max(0, ...rows.map(r => measure(r.left, F.value)));
+  const maxRightW = Math.max(0, ...rows.map(r => measure(r.right, F.value)));
+  const hasLeft = maxLeftW > 0 || rows.some(r => r.sep);
+  const valueW = hasLeft ? maxLeftW + valueGap * 2 + sepW + maxRightW : maxRightW;
+  const prW = measure('PR', F.pr) + 18;
+  const nameBlockW = (r) => measure(r.name, F.name) + (r.pr ? prW + 10 : 0) + (r.sub ? measure(r.sub, F.sub) + 10 : 0);
+  const maxNameBlockW = Math.max(0, ...rows.map(nameBlockW), rest.length ? measure(restLabel, F.more) : 0);
+  const rowsW = rowPadX * 2 + barW + barGap + maxNameBlockW + nameValueGap + valueW;
+
+  const blockW = Math.min(W - MARGIN * 2, Math.max(520, rowsW, headerW));
+  const headerH = 40 + 14 + 44 + 16;
+  const rowCount = rows.length + (rest.length ? 1 : 0);
+  const listH = listPadY * 2 + rowH * rowCount;
+  const blockH = headerH + listH;
+
+  const scale = Math.min((W - MARGIN * 2) / blockW, (H - TOP - FOOT_H) / blockH, 1.4);
+  const x0 = (W - blockW * scale) / 2;
+  const y0 = TOP + ((H - TOP - FOOT_H) - blockH * scale) / 2;
+
+  // ── Draw the block in its own coordinates.
+  ctx.save();
+  ctx.translate(x0, y0);
+  ctx.scale(scale, scale);
+
+  ctx.drawImage(icon, 0, 0, 40, 40);
   ctx.textAlign = 'left';
-  ctx.fillStyle = '#ffffff';
-  ctx.font = font(32, 'bold');
-  ctx.fillText('muscle-log', margin + iconSize + 16, margin + iconSize / 2 + 11);
+  ctx.fillStyle = C.brand;
+  ctx.font = F.brand;
+  ctx.fillText('muscle-log', 52, 21);
 
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.font = font(23);
-  ctx.fillText(formatDateLabel(date), margin, margin + iconSize + 34);
+  const dateY = 40 + 14 + 22;
+  ctx.fillStyle = C.text;
+  ctx.font = F.date;
+  ctx.fillText(dateLabel, 0, dateY);
 
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.roundRect(cardX, cardY, cardW, cardH, 20);
-  ctx.fill();
-
-  rows.forEach((ex, i) => {
-    const rowY = cardY + innerPad + rowH * i;
-    const color = CATEGORY_COLORS[ex.category] || '#3ea8ff';
-    const midY = rowY + rowH / 2;
-
-    ctx.fillStyle = color;
+  let chipRight = blockW;
+  [...chipSizes].reverse().forEach(({ parts, widths, w }) => {
+    const chipX = chipRight - w;
+    ctx.fillStyle = C.surface;
+    ctx.strokeStyle = C.border;
+    ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(cardX + 24, midY - 14, 5, 28, 2.5);
+    ctx.roundRect(chipX + 0.5, dateY - 15.5, w - 1, 31, 16);
     ctx.fill();
-
-    const nameX = cardX + 24 + 18;
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#333333';
-    ctx.font = font(25, 'bold');
-    ctx.fillText(ex.name, nameX, midY + 8);
-
-    if (ex.sub) {
-      const nameW = ctx.measureText(ex.name).width;
-      ctx.fillStyle = '#999999';
-      ctx.font = font(16);
-      ctx.fillText(ex.sub, nameX + nameW + 10, midY + 6);
-    }
-
-    ctx.textAlign = 'right';
-    ctx.fillStyle = color;
-    ctx.font = font(25, 'bold');
-    ctx.fillText(ex.primary, cardX + cardW - 24, midY + 8);
+    ctx.stroke();
+    let x = chipX + 14;
+    parts.forEach((part, i) => {
+      ctx.font = partFont(part);
+      ctx.fillStyle = part.strong ? C.text : C.sub;
+      ctx.fillText(part.text, x, dateY + 1);
+      x += widths[i] + 6;
+    });
+    chipRight = chipX - 8;
   });
 
-  if (overflow > 0) {
-    const rowY = cardY + innerPad + rowH * rows.length;
+  const listY = headerH;
+  ctx.fillStyle = C.surface;
+  ctx.strokeStyle = C.border;
+  ctx.beginPath();
+  ctx.roundRect(0.5, listY + 0.5, blockW - 1, listH - 1, 16);
+  ctx.fill();
+  ctx.stroke();
+
+  const rowLeft = rowPadX;
+  const rowRight = blockW - rowPadX;
+  const nameX = rowLeft + barW + barGap;
+  // Like the app's set rows, every value pivots on one separator column so × and / line up down the list.
+  const sepX = rowRight - maxRightW - valueGap - sepW / 2;
+  const leftEnd = sepX - sepW / 2 - valueGap;
+  const rightStart = sepX + sepW / 2 + valueGap;
+  const drawDivider = (i) => {
+    ctx.fillStyle = C.border;
+    ctx.fillRect(rowLeft, listY + listPadY + rowH * i, rowRight - rowLeft, 1);
+  };
+
+  rows.forEach((ex, i) => {
+    const midY = listY + listPadY + rowH * i + rowH / 2;
+    if (i > 0) drawDivider(i);
+
+    ctx.fillStyle = CATEGORY_COLORS[ex.category] || C.brand;
+    ctx.beginPath();
+    ctx.roundRect(rowLeft, midY - 13, barW, 26, 2.5);
+    ctx.fill();
+
+    ctx.font = F.value;
+    ctx.fillStyle = C.text;
+    let valueStart = rightStart;
+    if (ex.right) {
+      ctx.textAlign = 'left';
+      ctx.fillText(ex.right, rightStart, midY);
+    }
+    if (ex.sep) {
+      ctx.textAlign = 'center';
+      ctx.fillStyle = C.sub;
+      ctx.fillText(ex.sep, sepX, midY);
+      ctx.fillStyle = C.text;
+      valueStart = sepX - sepW / 2;
+    }
+    if (ex.left) {
+      ctx.textAlign = 'right';
+      ctx.fillText(ex.left, leftEnd, midY);
+      valueStart = leftEnd - ctx.measureText(ex.left).width;
+    }
+
     ctx.textAlign = 'left';
-    ctx.fillStyle = '#999999';
-    ctx.font = `italic ${font(18)}`;
-    ctx.fillText(`ほか${overflow}種目`, cardX + 24 + 18, rowY + rowH / 2 + 6);
+    const subW = ex.sub ? measure(ex.sub, F.sub) : 0;
+    const nameMax = valueStart - 24 - nameX - (ex.pr ? prW + 10 : 0) - (subW ? subW + 10 : 0);
+    ctx.font = F.name;
+    const name = fitText(ex.name, nameMax);
+    ctx.fillStyle = C.text;
+    ctx.fillText(name, nameX, midY);
+    let x = nameX + ctx.measureText(name).width + 10;
+
+    if (ex.pr) {
+      ctx.fillStyle = C.goldBg;
+      ctx.beginPath();
+      ctx.roundRect(x, midY - 11, prW, 22, 11);
+      ctx.fill();
+      ctx.fillStyle = C.gold;
+      ctx.font = F.pr;
+      ctx.fillText('PR', x + 9, midY + 1);
+      x += prW + 10;
+    }
+
+    if (ex.sub) {
+      ctx.fillStyle = C.mute;
+      ctx.font = F.sub;
+      ctx.fillText(ex.sub, x, midY + 1);
+    }
+  });
+
+  if (rest.length) {
+    drawDivider(rows.length);
+    ctx.textAlign = 'left';
+    ctx.fillStyle = C.mute;
+    ctx.font = F.more;
+    ctx.fillText(restLabel, nameX, listY + listPadY + rowH * rows.length + rowH / 2);
   }
 
-  ctx.textAlign = 'center';
-  ctx.fillStyle = 'rgba(255,255,255,0.85)';
-  ctx.font = font(18);
-  ctx.fillText('muscle-log-lilac.vercel.app', canvasW / 2, canvasH - 30);
+  ctx.restore();
+
+  // ── Footer stays at its natural size: brand, one-line pitch and the landing page, centered.
+  const footY = H - 26;
+  const host = SHARE_URL.replace(/^https:\/\//, '').replace(/\/$/, '');
+  const pieces = [
+    { text: 'muscle-log', f: F.footBold, color: C.brandDark },
+    { text: '  ·  ', f: F.foot, color: C.mute },
+    { text: 'シンプルな筋トレ記録アプリ', f: F.foot, color: C.sub },
+    { text: '  ·  ', f: F.foot, color: C.mute },
+    { text: host, f: F.foot, color: C.sub },
+  ];
+  const footW = pieces.reduce((x, piece) => x + measure(piece.text, piece.f), 0);
+  let fx = (W - footW) / 2;
+  ctx.textAlign = 'left';
+  pieces.forEach(piece => {
+    ctx.font = piece.f;
+    ctx.fillStyle = piece.color;
+    ctx.fillText(piece.text, fx, footY);
+    fx += ctx.measureText(piece.text).width;
+  });
 
   return canvas;
 }
 
 document.getElementById('btn-share-log').addEventListener('click', async () => {
   const date = logDateInput.value || today();
-  const highlights = sessionExercises.filter(ex => ex.sets.length > 0).map(getShareHighlight);
+  const exercises = sessionExercises.filter(ex => ex.sets.length > 0);
+  const highlights = exercises.map(getShareHighlight);
   if (!highlights.length) return;
+  const summary = buildShareSummary(exercises);
 
   let canvas;
   try {
-    canvas = await buildShareCard(date, highlights);
+    canvas = await buildShareCard(date, highlights, summary);
   } catch (err) {
     console.error('buildShareCard failed:', err);
     alert('シェア用の画像を作れませんでした。もう一度試してください。');
@@ -1988,7 +2139,14 @@ document.getElementById('btn-share-log').addEventListener('click', async () => {
     if (!blob) return;
     const filename = `muscle-log-${date}.png`;
     const file = new File([blob], filename, { type: 'image/png' });
-    const caption = `${formatDateShort(date)}の記録 💪\n\n#筋トレ記録 #musclelog\nhttps://muscle-log-lilac.vercel.app/`;
+    const dateText = new Date(date + 'T00:00:00').toLocaleDateString('ja-JP', { month: 'long', day: 'numeric' });
+    const prNames = highlights.filter(h => h.pr).map(h => h.name);
+    const lines = [
+      `${dateText}のトレーニング 💪`,
+      `${summary.categories.join('・')} / ${summary.exerciseCount}種目`,
+      ...(prNames.length ? [`${prNames.join('・')}で自己ベスト更新!`] : []),
+    ];
+    const caption = `${lines.join('\n')}\n\n#筋トレ記録 #musclelog\n${SHARE_URL}`;
 
     if (navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
