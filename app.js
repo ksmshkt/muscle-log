@@ -964,62 +964,76 @@ async function saveExercise() {
   btn.textContent = '保存中…';
 
   const date = logDateInput.value || today();
+  const oldSessionIds = [...existingSessionIds];
 
-  // 既存セッションがあれば削除して上書き
-  if (existingSessionIds.length) {
-    await sb.from('sets').delete().in('session_id', existingSessionIds);
-    await sb.from('sessions').delete().in('id', existingSessionIds);
-    existingSessionIds = [];
-  }
+  const fail = (err) => {
+    console.error('saveExercise:', err);
+    alert('保存できませんでした。通信状態を確認して、もう一度試してください。');
+    btn.disabled = false;
+    updateSaveButton();
+  };
 
+  // Write the new record first and only remove the old one once everything has landed,
+  // so a failure part-way leaves the previously saved day intact.
   const { data: session, error: sessionError } = await sb
     .from('sessions')
     .insert({ user_id: user.id, date: date })
     .select()
     .single();
+  if (sessionError) return fail(sessionError);
 
-  if (sessionError) {
-    btn.disabled = false;
-    btn.textContent = '保存';
-    return;
-  }
+  try {
+    for (const ex of exercises) {
+      let exerciseId = ex.id;
 
-  for (const ex of exercises) {
-    let exerciseId = ex.id;
-
-    if (!exerciseId) {
-      const { data: existing } = await sb
-        .from('exercises')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('name', ex.name)
-        .maybeSingle();
-
-      if (existing) {
-        exerciseId = existing.id;
-      } else {
-        const { data: created } = await sb
+      if (!exerciseId) {
+        const { data: existing, error: findError } = await sb
           .from('exercises')
-          .insert({ user_id: user.id, name: ex.name, category: ex.category, is_preset: true })
-          .select()
-          .single();
-        exerciseId = created?.id;
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('name', ex.name)
+          .maybeSingle();
+        if (findError) throw findError;
+
+        if (existing) {
+          exerciseId = existing.id;
+        } else {
+          const { data: created, error: createError } = await sb
+            .from('exercises')
+            .insert({ user_id: user.id, name: ex.name, category: ex.category, is_preset: true })
+            .select()
+            .single();
+          if (createError) throw createError;
+          exerciseId = created.id;
+        }
       }
+
+      const { error: setsError } = await sb.from('sets').insert(
+        ex.sets.map(s => ({
+          session_id: session.id,
+          exercise_id: exerciseId,
+          weight: s.weight ?? null,
+          reps: s.reps ?? null,
+          duration: s.duration ?? null,
+          value2: s.value2 ?? null,
+          unit: currentUnit,
+        }))
+      );
+      if (setsError) throw setsError;
     }
 
-    if (!exerciseId) continue;
-
-    await sb.from('sets').insert(
-      ex.sets.map(s => ({
-        session_id: session.id,
-        exercise_id: exerciseId,
-        weight: s.weight ?? null,
-        reps: s.reps ?? null,
-        duration: s.duration ?? null,
-        value2: s.value2 ?? null,
-        unit: currentUnit,
-      }))
-    );
+    if (oldSessionIds.length) {
+      const { error: oldSetsError } = await sb.from('sets').delete().in('session_id', oldSessionIds);
+      if (oldSetsError) throw oldSetsError;
+      // The old sets are gone at this point, so a leftover empty session is harmless; just log it.
+      const { error: oldSessionsError } = await sb.from('sessions').delete().in('id', oldSessionIds);
+      if (oldSessionsError) console.error('saveExercise: old session cleanup', oldSessionsError);
+    }
+  } catch (err) {
+    // Roll back only what this save created; the earlier record is still untouched.
+    await sb.from('sets').delete().eq('session_id', session.id);
+    await sb.from('sessions').delete().eq('id', session.id);
+    return fail(err);
   }
 
   const personalBests = exercises.flatMap(ex => {
