@@ -395,9 +395,9 @@ function renderExerciseList() {
 
   exerciseListEl.innerHTML = all.length
     ? all.map(ex => `
-        <li data-name="${ex.name}" data-cat="${ex.category}"${ex.id ? ` data-id="${ex.id}"` : ''}${ex.cardio_unit ? ` data-unit="${ex.cardio_unit}"` : ''}>
-          <span class="ex-name">${exerciseLabel(ex.name)}</span>
-          ${ex.id ? `<button class="btn-delete-custom" data-id="${ex.id}" data-name="${ex.name}">✕</button>` : ''}
+        <li data-name="${escapeHtml(ex.name)}" data-cat="${escapeHtml(ex.category)}"${ex.id ? ` data-id="${escapeHtml(ex.id)}"` : ''}${ex.cardio_unit ? ` data-unit="${escapeHtml(ex.cardio_unit)}"` : ''}>
+          <span class="ex-name">${escapeHtml(exerciseLabel(ex.name))}</span>
+          ${ex.id ? `<button class="btn-delete-custom" data-id="${escapeHtml(ex.id)}" data-name="${escapeHtml(ex.name)}">✕</button>` : ''}
         </li>`).join('')
     : '<li style="color:var(--text-sub);cursor:default">種目がありません</li>';
 
@@ -417,6 +417,29 @@ function renderExerciseList() {
 }
 
 const TRASH_ICON = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M10 11v6M14 11v6"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>`;
+
+// Out-of-range numbers (negative, absurdly large) are refused with a message instead of being logged.
+// Weight allows 4 digits because lbs leg-press loads can pass 1,000.
+const INPUT_LIMITS = {
+  weight:   { valid: v => v > 0 && v <= 9999,  message: '重さは0より大きく、9999以下で入力してください。' },
+  reps:     { valid: v => v >= 1 && v <= 999,  message: '回数は1〜999で入力してください。' },
+  duration: { valid: v => v >= 1 && v <= 1440, message: '時間は1〜1440分で入力してください。' },
+  value2:   { valid: v => v >= 0 && v <= 9999, message: '値は0〜9999で入力してください。' },
+};
+
+const MAX_EXERCISE_NAME = 40;
+const MAX_UNIT_LABEL = 12;
+
+function checkRange(kind, value) {
+  if (INPUT_LIMITS[kind].valid(value)) return true;
+  alert(INPUT_LIMITS[kind].message);
+  return false;
+}
+
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, c => HTML_ESCAPES[c]);
+}
 
 // ── Exercise blocks ──
 async function addExercise(name, category, id = null, cardioUnit = null) {
@@ -488,7 +511,7 @@ function renderExerciseBlocks() {
     const expanded = editing || ex.isExpanded !== false;
     const setCount = ex.sets.length;
 
-    const cardioUnit = unitLabel(ex.cardioUnit || 'Value');
+    const cardioUnit = escapeHtml(unitLabel(ex.cardioUnit || 'Value'));
 
     // Every set renders as left · separator · right so values line up down the list for all exercise types.
     // Hidden padding is added only when an exercise mixes digit counts or decimals, so uniform sets stay tight.
@@ -532,14 +555,14 @@ function renderExerciseBlocks() {
       : `<div class="si-l"><input type="number" class="input-weight" data-ei="${i}" placeholder="${phWeight}" min="0" step="0.5" /><span class="si-unit">${currentUnit}</span></div><span class="set-sep">×</span><div class="si-r"><input type="number" class="input-reps" data-ei="${i}" placeholder="${phReps}" min="1" step="1" /><span class="si-unit">回</span></div>`;
 
     const catLabel = (!editing && !expanded && setCount)
-      ? `${categoryLabel(ex.category)} · ${setCount}セット`
-      : categoryLabel(ex.category);
+      ? `${escapeHtml(categoryLabel(ex.category))} · ${setCount}セット`
+      : escapeHtml(categoryLabel(ex.category));
 
     return `
-    <div class="exercise-block" data-cat="${ex.category}">
+    <div class="exercise-block" data-cat="${escapeHtml(ex.category)}">
       <div class="exercise-block-header${!editing ? ' accordion-header' : ''}" data-i="${i}">
         <div class="exercise-info">
-          <div class="exercise-name">${exerciseLabel(ex.name)}</div>
+          <div class="exercise-name">${escapeHtml(exerciseLabel(ex.name))}</div>
           <div class="exercise-category">${catLabel}</div>
         </div>
         <div class="exercise-header-btns">
@@ -608,64 +631,49 @@ function renderExerciseBlocks() {
     return ph || null;
   };
 
+  // One path for the + button and Enter, so every new set goes through the same range checks.
+  const tryAddSet = (ei) => {
+    const itype = setInputType(sessionExercises[ei].category);
+    const field = (cls) => exerciseBlocksEl.querySelector(`.${cls}[data-ei="${ei}"]`);
+    // Typed value (even 0, so it can be range-checked), else the previous set shown as the placeholder,
+    // else null meaning nothing has been entered yet.
+    const read = (el, parse) => {
+      const raw = el.value.trim();
+      if (raw !== '') return parse(raw);
+      const prev = parse(el.placeholder);
+      return prev > 0 ? prev : null;
+    };
+
+    if (itype === 'cardio') {
+      const duration = read(field('input-duration'), parseInt);
+      if (duration == null) { alert('時間を入力してください。'); return; }
+      const value2 = readCardioValue2(ei);
+      if (!checkRange('duration', duration) || (value2 != null && !checkRange('value2', value2))) return;
+      addSet(ei, null, null, duration, value2);
+      return;
+    }
+
+    const reps = read(field('input-reps'), parseInt);
+    if (itype === 'core') {
+      if (reps == null) { alert('回数を入力してください。'); return; }
+      if (!checkRange('reps', reps)) return;
+      addSet(ei, null, reps, null);
+      return;
+    }
+
+    const weight = read(field('input-weight'), parseFloat);
+    if (weight == null || reps == null) { alert('重さと回数を入力してください。'); return; }
+    if (!checkRange('weight', weight) || !checkRange('reps', reps)) return;
+    addSet(ei, weight, reps, null);
+  };
+
   exerciseBlocksEl.querySelectorAll('.btn-add-set').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const ei    = +btn.dataset.ei;
-      const itype = setInputType(sessionExercises[ei].category);
-      if (itype === 'cardio') {
-        const durEl  = exerciseBlocksEl.querySelector(`.input-duration[data-ei="${ei}"]`);
-        const duration = parseInt(durEl.value) || parseInt(durEl.placeholder) || 0;
-        if (!duration) return;
-        addSet(ei, null, null, duration, readCardioValue2(ei));
-      } else if (itype === 'core') {
-        const repsEl = exerciseBlocksEl.querySelector(`.input-reps[data-ei="${ei}"]`);
-        const reps   = parseInt(repsEl.value) || parseInt(repsEl.placeholder) || 0;
-        if (!reps) return;
-        addSet(ei, null, reps, null);
-      } else {
-        const wEl    = exerciseBlocksEl.querySelector(`.input-weight[data-ei="${ei}"]`);
-        const repsEl = exerciseBlocksEl.querySelector(`.input-reps[data-ei="${ei}"]`);
-        const weight = parseFloat(wEl.value)    || parseFloat(wEl.placeholder)    || 0;
-        const reps   = parseInt(repsEl.value)   || parseInt(repsEl.placeholder)   || 0;
-        if (!weight || !reps) return;
-        addSet(ei, weight, reps, null);
-      }
-    });
+    btn.addEventListener('click', () => tryAddSet(+btn.dataset.ei));
   });
 
-  exerciseBlocksEl.querySelectorAll('.input-reps').forEach(input => {
+  exerciseBlocksEl.querySelectorAll('.input-reps, .input-duration, .input-cardio-value').forEach(input => {
     input.addEventListener('keydown', e => {
-      if (e.key !== 'Enter') return;
-      const ei    = +input.dataset.ei;
-      const itype = setInputType(sessionExercises[ei].category);
-      if (itype === 'core') {
-        const reps = parseInt(input.value) || parseInt(input.placeholder) || 0;
-        if (reps) addSet(ei, null, reps, null);
-      } else {
-        const wEl    = exerciseBlocksEl.querySelector(`.input-weight[data-ei="${ei}"]`);
-        const weight = parseFloat(wEl.value) || parseFloat(wEl.placeholder) || 0;
-        const reps   = parseInt(input.value) || parseInt(input.placeholder) || 0;
-        if (weight && reps) addSet(ei, weight, reps, null);
-      }
-    });
-  });
-
-  exerciseBlocksEl.querySelectorAll('.input-duration').forEach(input => {
-    input.addEventListener('keydown', e => {
-      if (e.key !== 'Enter') return;
-      const ei       = +input.dataset.ei;
-      const duration = parseInt(input.value) || parseInt(input.placeholder) || 0;
-      if (duration) addSet(ei, null, null, duration, readCardioValue2(ei));
-    });
-  });
-
-  exerciseBlocksEl.querySelectorAll('.input-cardio-value').forEach(input => {
-    input.addEventListener('keydown', e => {
-      if (e.key !== 'Enter') return;
-      const ei      = +input.dataset.ei;
-      const durEl   = exerciseBlocksEl.querySelector(`.input-duration[data-ei="${ei}"]`);
-      const duration = parseInt(durEl.value) || parseInt(durEl.placeholder) || 0;
-      if (duration) addSet(ei, null, null, duration, readCardioValue2(ei));
+      if (e.key === 'Enter') tryAddSet(+input.dataset.ei);
     });
   });
 
@@ -1061,7 +1069,7 @@ const modalPr = document.getElementById('modal-pr');
 function showPersonalBests(bests) {
   document.getElementById('pr-list').innerHTML = bests.map(b => `
     <li>
-      <span class="pr-ex-name">${exerciseLabel(b.name)}</span>
+      <span class="pr-ex-name">${escapeHtml(exerciseLabel(b.name))}</span>
       <span class="pr-ex-detail">${b.weight}${currentUnit} × ${b.reps}回</span>
       <span class="pr-ex-prev">これまで ${b.prev}${currentUnit}</span>
     </li>
@@ -1154,9 +1162,11 @@ inputBodyWeight.addEventListener('blur', async () => {
 btnSaveCustom.addEventListener('click', async () => {
   const name = customInput.value.trim();
   if (!name) { setCustomExerciseError('種目名を入力してください。'); return; }
+  if (name.length > MAX_EXERCISE_NAME) { setCustomExerciseError(`種目名は${MAX_EXERCISE_NAME}文字以内で入力してください。`); return; }
 
   const cardioUnit = activeCategory === 'Cardio' ? customUnitInput.value.trim() : null;
   if (activeCategory === 'Cardio' && !cardioUnit) { setCustomExerciseError('この種目の単位を入力してください。'); return; }
+  if (cardioUnit && cardioUnit.length > MAX_UNIT_LABEL) { setCustomExerciseError(`単位は${MAX_UNIT_LABEL}文字以内で入力してください。`); return; }
 
   setCustomExerciseError('');
 
@@ -1355,7 +1365,7 @@ async function loadCharts() {
   list.innerHTML = `<li class="ex-select-item" data-id="">種目を選択</li>` +
     recordedExercises.map(ex => {
       const color = CAT_COLORS[ex.category] || 'transparent';
-      return `<li class="ex-select-item" data-id="${ex.id}" data-cat="${ex.category || ''}" data-name="${ex.name}" style="border-left-color:${color}">${exerciseLabel(ex.name)}<span class="ex-select-cat">${ex.category ? categoryLabel(ex.category) : ''}</span></li>`;
+      return `<li class="ex-select-item" data-id="${escapeHtml(ex.id)}" data-cat="${escapeHtml(ex.category)}" data-name="${escapeHtml(ex.name)}" style="border-left-color:${color}">${escapeHtml(exerciseLabel(ex.name))}<span class="ex-select-cat">${ex.category ? escapeHtml(categoryLabel(ex.category)) : ''}</span></li>`;
     }).join('');
   const found = currentExerciseId && recordedExercises.find(ex => String(ex.id) === String(currentExerciseId));
   if (found) { setExSelectLabel(exerciseLabel(found.name), CAT_COLORS[found.category] || ''); currentExerciseCategory = found.category || null; }
@@ -1768,7 +1778,7 @@ async function loadCopySummaries(dates) {
     const ids = [...(exercisesByDate[d] || [])];
     const cats = [...new Set(ids.map(id => categoryById[id]).filter(Boolean))]
       .sort((a, b) => CATEGORIES.indexOf(a) - CATEGORIES.indexOf(b))
-      .map(categoryLabel);
+      .map(cat => escapeHtml(categoryLabel(cat)));
     copySummaries.set(d, ids.length ? `${cats.join('・')} · ${ids.length}種目` : '記録なし');
   });
 }
