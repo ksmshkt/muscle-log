@@ -253,7 +253,7 @@ authForm.addEventListener('submit', async e => {
   const email    = authEmail.value.trim();
   const password = authPassword.value;
 
-  const { error } = authMode === 'signin'
+  const { data, error } = authMode === 'signin'
     ? await sb.auth.signInWithPassword({ email, password })
     : await sb.auth.signUp({ email, password, options: { data: { unit: signupUnit } } });
 
@@ -261,7 +261,8 @@ authForm.addEventListener('submit', async e => {
 
   if (error) {
     setError(authErrorMessage(error));
-  } else if (authMode === 'signup') {
+  } else if (authMode === 'signup' && !data.session) {
+    // No session means the project requires email confirmation; with it off the user is already signed in.
     setError('確認メールを送りました。メール内のリンクを開いて登録を完了してください。');
   }
 });
