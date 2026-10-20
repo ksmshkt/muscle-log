@@ -429,6 +429,9 @@
     color: var(--ink-soft);
   }
 
+  .footer-links { display: flex; justify-content: center; gap: 16px; margin-top: 8px; }
+  .footer-links a { color: var(--ink-soft); }
+
   /* ── Reveal on scroll ── */
   .reveal {
     opacity: 0;
@@ -640,7 +643,10 @@
       <a class="btn btn-primary" href="https://muscle-log-lilac.vercel.app/" target="_blank" rel="noopener">使ってみる →</a>
     </div>
   </section>
-  <footer>muscle-log — a minimal workout logger. Built by @ksmshkt.</footer>
+  <footer>
+    muscle-log — a minimal workout logger. Built by @ksmshkt.
+    <span class="footer-links"><a href="../terms/">利用規約</a><a href="../privacy/">プライバシーポリシー</a></span>
+  </footer>
 </div>
 
 <script>

@@ -132,6 +132,7 @@ authModeTabs.forEach(tab => {
     tab.classList.add('active');
     authSubmit.textContent = authMode === 'signin' ? 'ログイン' : '登録する';
     document.getElementById('auth-unit-group').classList.toggle('hidden', authMode !== 'signup');
+    document.getElementById('auth-consent').classList.toggle('hidden', authMode !== 'signup');
     btnForgotPassword.classList.toggle('hidden', authMode !== 'signin');
     setError('');
   });
@@ -781,45 +782,36 @@ async function changeAccountUnit(newUnit) {
   }
 }
 
-document.getElementById('btn-delete-account').addEventListener('click', deleteAllUserData);
+document.getElementById('btn-delete-account').addEventListener('click', deleteAccount);
 
-async function deleteAllUserData() {
+// Deletes the signed-in user's records and the auth account itself through the
+// delete_own_account() database function (see supabase/delete_own_account.sql).
+async function deleteAccount() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return;
 
   const confirmed = confirm(
-    'トレーニングと体重の記録をすべて削除します。元に戻すことはできません。\n\n' +
-    'アカウント自体は削除されません。あとでログインすると、空のアカウントとして使えます。\n\n' +
+    'アカウントと、トレーニング・体重の記録をすべて削除します。元に戻すことはできません。\n\n' +
     '必要なら、先にデータを書き出してください(グラフのタブから)。\n\n' +
-    '削除しますか?'
+    'アカウントを削除しますか?'
   );
   if (!confirmed) return;
 
   const btn = document.getElementById('btn-delete-account');
   btn.disabled = true;
 
-  try {
-    const { data: sessions } = await sb.from('sessions').select('id').eq('user_id', user.id);
-    const sessionIds = (sessions || []).map(s => s.id);
-
-    if (sessionIds.length) {
-      await sb.from('sets').delete().in('session_id', sessionIds);
-    }
-
-    await Promise.all([
-      sb.from('sessions').delete().eq('user_id', user.id),
-      sb.from('exercises').delete().eq('user_id', user.id),
-      sb.from('body_weights').delete().eq('user_id', user.id),
-    ]);
-
-    alert('すべての記録を削除しました。');
-    await sb.auth.signOut();
-  } catch (err) {
-    console.error('deleteAllUserData:', err);
-    alert('記録を削除できませんでした。もう一度試してください。');
-  } finally {
+  const { error } = await sb.rpc('delete_own_account');
+  if (error) {
+    console.error('deleteAccount:', error);
+    alert('アカウントを削除できませんでした。もう一度試してください。');
     btn.disabled = false;
+    return;
   }
+
+  alert('アカウントを削除しました。ご利用ありがとうございました。');
+  // The account no longer exists on the server, so only clear the local session.
+  await sb.auth.signOut({ scope: 'local' });
+  btn.disabled = false;
 }
 
 // ── Load existing records for selected date ──

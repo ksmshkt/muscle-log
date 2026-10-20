@@ -2039,3 +2039,25 @@ main {
   .pr-confetti span,
   .pr-card { animation: none; }
 }
+
+/* ── Legal links ── */
+.auth-consent {
+  margin-top: 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-sub);
+  text-align: center;
+}
+
+.auth-consent a,
+.account-menu-legal a {
+  color: var(--text-sub);
+}
+
+.account-menu-legal {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  padding: 8px 10px 4px;
+  font-size: 11px;
+}

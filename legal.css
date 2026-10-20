@@ -1,0 +1,145 @@
+/* Shared by /privacy/ and /terms/. Colors follow the landing page. */
+:root {
+  --bg: #eef2f6;
+  --surface: #ffffff;
+  --border: #dde4ec;
+  --ink: #16202e;
+  --ink-soft: #5b6b7d;
+  --accent: #3ea8ff;
+  --accent-deep: #1565c0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f151c;
+    --surface: #161e27;
+    --border: #263140;
+    --ink: #eef2f6;
+    --ink-soft: #94a4b6;
+    --accent: #5fb8ff;
+    --accent-deep: #8fd0ff;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Segoe UI", sans-serif;
+  line-height: 1.8;
+}
+
+.top {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 20px 20px 0;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 18px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.doc {
+  max-width: 760px;
+  margin: 20px auto 0;
+  padding: 32px 28px 40px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+
+@media (max-width: 800px) {
+  .doc { margin: 16px 12px 0; padding: 24px 18px 32px; }
+}
+
+.doc h1 {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.4;
+}
+
+.doc .meta {
+  margin: 6px 0 24px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.doc h2 {
+  margin: 32px 0 8px;
+  font-size: 17px;
+  line-height: 1.5;
+}
+
+.doc p,
+.doc li {
+  font-size: 15px;
+}
+
+.doc p { margin: 8px 0; }
+
+.doc ul,
+.doc ol {
+  margin: 8px 0;
+  padding-left: 1.4em;
+}
+
+.doc li + li { margin-top: 4px; }
+
+.doc a { color: var(--accent-deep); }
+
+.table-wrap {
+  overflow-x: auto;
+  margin: 12px 0;
+}
+
+.doc table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.doc th,
+.doc td {
+  text-align: left;
+  vertical-align: top;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.doc th {
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.doc td:first-child { white-space: nowrap; font-weight: 600; }
+
+.legal-foot {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 20px 40px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 20px;
+  font-size: 13px;
+}
+
+.legal-foot a {
+  color: var(--ink-soft);
+  text-decoration: none;
+}
+
+.legal-foot a[aria-current="page"] {
+  color: var(--ink);
+  font-weight: 600;
+}
