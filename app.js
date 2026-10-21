@@ -427,19 +427,23 @@ modalCloseBtn.addEventListener('click', closeModal);
 modalOverlay.addEventListener('click', closeModal);
 
 // ── Category tabs ──
+function selectCategory(cat) {
+  activeCategory = cat;
+  renamingExerciseId = null;
+  renderCategoryTabs();
+  renderExerciseList();
+}
+
 function renderCategoryTabs() {
   categoryTabsEl.innerHTML = CATEGORIES.map(cat => `
     <button class="category-tab${cat === activeCategory ? ' active' : ''}" data-cat="${cat}">${categoryLabel(cat)}</button>
   `).join('');
 
   categoryTabsEl.querySelectorAll('.category-tab').forEach(btn => {
-    btn.addEventListener('click', () => {
-      activeCategory = btn.dataset.cat;
-      renamingExerciseId = null;
-      renderCategoryTabs();
-      renderExerciseList();
-    });
+    btn.addEventListener('click', () => selectCategory(btn.dataset.cat));
   });
+
+  categoryTabsEl.querySelector('.category-tab.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 
   customUnitInput.classList.toggle('hidden', activeCategory !== 'Cardio');
   customLoadToggle.classList.toggle('hidden', !LOAD_TYPE_CATEGORIES.includes(activeCategory));
@@ -562,6 +566,22 @@ async function saveExerciseRename(rawName) {
 }
 
 exerciseListEl.addEventListener('scroll', updateExerciseListHints);
+
+// Swipe the exercise list left/right to move to the next/previous body part.
+let pickerSwipeX = 0;
+let pickerSwipeY = 0;
+exerciseListWrap.addEventListener('touchstart', e => {
+  pickerSwipeX = e.touches[0].clientX;
+  pickerSwipeY = e.touches[0].clientY;
+}, { passive: true });
+exerciseListWrap.addEventListener('touchend', e => {
+  if (renamingExerciseId) return;
+  const dx = e.changedTouches[0].clientX - pickerSwipeX;
+  const dy = e.changedTouches[0].clientY - pickerSwipeY;
+  if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+  const i = CATEGORIES.indexOf(activeCategory) + (dx < 0 ? 1 : -1);
+  if (i >= 0 && i < CATEGORIES.length) selectCategory(CATEGORIES[i]);
+}, { passive: true });
 
 const TRASH_ICON = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M10 11v6M14 11v6"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>`;
 

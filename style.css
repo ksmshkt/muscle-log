@@ -1706,12 +1706,16 @@ main {
 /* ── Exercise list ── */
 .exercise-list-wrap { position: relative; }
 
-/* About five rows, with the next one peeking out; the "さらにN件" pill covers anything below. */
+/* Fixed at about five rows (the next one peeks out) so the picker is the same size on every tab;
+   the "さらにN件" pill covers anything below. */
 .exercise-list {
   list-style: none;
-  max-height: 250px;
+  height: 250px;
   overflow-y: auto;
 }
+
+/* The custom-exercise section's top border already separates the list. */
+.exercise-list li:last-child { border-bottom: none; }
 
 /* Edge fades appear only in the direction there is more to scroll. */
 .exercise-list-wrap::before,
@@ -1898,8 +1902,10 @@ main {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
+/* Always pinned to the row's right end, so it doesn't jump left on tabs without the switch (Core). */
 .btn-add-custom {
   flex-shrink: 0;
+  margin-left: auto;
   height: 36px;
   padding: 0 16px;
   border: none;
