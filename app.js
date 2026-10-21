@@ -49,7 +49,32 @@ const resetPasswordSubmit = document.getElementById('reset-password-submit');
 let authMode = 'signin';
 
 // ── Helpers ──
+// iOS Safari scrolls (and rubber-bands) the page behind a modal when you drag or the keyboard opens.
+// Pinning the page while the log modal is open keeps the view from shifting; the picker and PR popup
+// only ever open on top of it, so they're covered too.
+let pageScrollY = 0;
+
+function lockPageScroll() {
+  if (document.body.classList.contains('scroll-locked')) return;
+  pageScrollY = window.scrollY;
+  document.body.style.top = `-${pageScrollY}px`;
+  document.body.classList.add('scroll-locked');
+}
+
+function unlockPageScroll() {
+  if (!document.body.classList.contains('scroll-locked')) return;
+  document.body.classList.remove('scroll-locked');
+  document.body.style.top = '';
+  window.scrollTo(0, pageScrollY);
+}
+
+// After the keyboard closes, Safari can leave the view shifted up; snap it back while the page is pinned.
+document.addEventListener('focusout', () => {
+  if (document.body.classList.contains('scroll-locked')) setTimeout(() => window.scrollTo(0, 0), 60);
+});
+
 function showAuth() {
+  unlockPageScroll();
   authScreen.classList.remove('hidden');
   app.classList.add('hidden');
   resetPasswordScreen.classList.add('hidden');
@@ -84,12 +109,14 @@ function showApp() {
 function openLogModal(date) {
   document.getElementById('modal-log-date').textContent = formatDateLabel(date);
   document.getElementById('modal-log').classList.remove('hidden');
+  lockPageScroll();
 }
 
 function closeLogModal(force = false) {
   if (!force && sessionChanged && !confirm('保存していない変更があります。保存せずに閉じますか?')) return;
 
   sessionChanged = false;
+  unlockPageScroll();
   const bwVal  = parseFloat(inputBodyWeight.value);
   const bwDate = logDateInput.value || today();
   saveBodyWeight(bwDate, bwVal);

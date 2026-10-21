@@ -2235,3 +2235,23 @@ main {
   font-weight: 600;
   color: var(--text-sub);
 }
+
+/* ── iOS Safari: no rubber-band on the page, and scrolling inside a panel doesn't chain to the page ── */
+html,
+body {
+  overscroll-behavior: none;
+}
+
+.modal-content,
+.exercise-list,
+#modal-log #exercise-blocks,
+.copy-day-list {
+  overscroll-behavior: contain;
+}
+
+body.scroll-locked {
+  position: fixed;
+  left: 0;
+  right: 0;
+  overflow: hidden;
+}
