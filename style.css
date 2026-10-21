@@ -800,7 +800,7 @@ main {
   gap: 8px;
 }
 
-.log-bw-section input[type="number"] {
+.log-bw-section input {
   width: 72px;
   padding: 7px 8px;
   border: 1px solid var(--border);
@@ -811,7 +811,7 @@ main {
   transition: border-color 0.2s;
 }
 
-.log-bw-section input[type="number"]:focus {
+.log-bw-section input:focus {
   border-color: var(--primary);
 }
 

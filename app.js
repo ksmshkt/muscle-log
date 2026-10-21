@@ -117,7 +117,7 @@ function closeLogModal(force = false) {
 
   sessionChanged = false;
   unlockPageScroll();
-  const bwVal  = parseFloat(inputBodyWeight.value);
+  const bwVal  = readBodyWeightInput().value;
   const bwDate = logDateInput.value || today();
   saveBodyWeight(bwDate, bwVal);
 
@@ -360,6 +360,7 @@ let activeCategory = CATEGORIES[0];
 let currentUnit = 'kg';
 let existingSessionIds = [];
 let bwSavedValue = '';
+let bwPrevValue = '';
 let sessionChanged = false;
 let calendarYear    = new Date().getFullYear();
 let calendarMonth   = new Date().getMonth();
@@ -1032,6 +1033,13 @@ async function loadDateRecord(date) {
   if (bwRow) inputBodyWeight.value = bwRow.weight;
   bwSavedValue = bwRow ? String(bwRow.weight) : '';
 
+  // The most recent earlier weigh-in becomes the placeholder and the one-tap starting value.
+  const { data: prevBwRows } = await sb.from('body_weights')
+    .select('weight').eq('user_id', user.id).lt('date', date)
+    .order('date', { ascending: false }).limit(1);
+  bwPrevValue = prevBwRows?.[0] ? String(prevBwRows[0].weight) : '';
+  inputBodyWeight.placeholder = bwPrevValue || '0.0';
+
   if (!sessions?.length) {
     existingSessionIds = [];
     renderExerciseBlocks();
@@ -1328,15 +1336,33 @@ function showBwStatus(message, isError = false) {
   bwStatusTimer = setTimeout(() => bwStatusEl.classList.add('hidden'), 2000);
 }
 
+// The field is a text input (for the iOS decimal keypad), so validate it here. Full-width digits
+// from a Japanese keyboard are folded to ASCII; anything else that isn't a plain number is refused.
+function readBodyWeightInput() {
+  const raw = inputBodyWeight.value.trim()
+    .replace(/[０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[．。]/g, '.');
+  if (raw === '') return { raw, value: null };
+  if (!/^\d{1,3}(\.\d{1,2})?$/.test(raw) || Number(raw) <= 0) return { raw, value: NaN };
+  return { raw, value: Number(raw) };
+}
+
+// Tapping an empty field fills in the last weight, selected, so leaving it saves that value
+// and typing replaces it.
+inputBodyWeight.addEventListener('focus', () => {
+  if (inputBodyWeight.value || !bwPrevValue) return;
+  inputBodyWeight.value = bwPrevValue;
+  inputBodyWeight.select();
+});
+
 inputBodyWeight.addEventListener('blur', async () => {
   const date = logDateInput.value || today();
-  // A number input reports an empty value for unparsable text, so badInput tells the two apart.
-  if (inputBodyWeight.validity.badInput) {
+  const { raw, value } = readBodyWeightInput();
+  if (Number.isNaN(value)) {
     showBwStatus('数値を入力してください', true);
     return;
   }
-
-  const raw = inputBodyWeight.value.trim();
+  inputBodyWeight.value = raw;
   if (raw === bwSavedValue) return;
 
   if (raw === '') {
@@ -1346,9 +1372,7 @@ inputBodyWeight.addEventListener('blur', async () => {
     return;
   }
 
-  const val = parseFloat(raw);
-  if (!val) return;
-  const saved = await saveBodyWeight(date, val);
+  const saved = await saveBodyWeight(date, value);
   if (saved) bwSavedValue = raw;
   showBwStatus(saved ? '保存しました' : '保存できませんでした', !saved);
 });
