@@ -273,18 +273,32 @@ btnSignout.addEventListener('click', async () => {
 });
 
 const PRESETS = {
-  Chest:     ['Bench Press', 'Chest Press', 'Dumbbell Fly', 'Pec Deck'],
-  Back:      ['Deadlift', 'Lat Pulldown', 'Bent Over Row'],
-  Legs:      ['Squat', 'Leg Press', 'Leg Curl', 'Leg Extension', 'Calf Raise', 'Hip Adduction'],
-  Shoulders: ['Shoulder Press', 'Lateral Raise'],
-  Arms:      ['Barbell Curl', 'Triceps Pressdown'],
-  Core:      ['Decline Sit-up', 'Crunch', 'Hanging Leg Raise'],
+  Chest:     ['Bench Press', 'Chest Press', 'Dumbbell Fly', 'Pec Deck', 'Push-up', 'Dips'],
+  Back:      ['Deadlift', 'Lat Pulldown', 'Bent Over Row', 'Pull-up', 'Inverted Row', 'Back Extension'],
+  Legs:      ['Squat', 'Leg Press', 'Leg Curl', 'Leg Extension', 'Calf Raise', 'Hip Adduction', 'Bodyweight Squat', 'Lunge', 'Hip Lift', 'Bodyweight Calf Raise'],
+  Shoulders: ['Shoulder Press', 'Lateral Raise', 'Pike Push-up'],
+  Arms:      ['Barbell Curl', 'Triceps Pressdown', 'Reverse Push-up'],
+  Core:      ['Decline Sit-up', 'Crunch', 'Hanging Leg Raise', 'Reverse Crunch', 'Twist Crunch'],
   Cardio:    ['Running', 'Bike'],
 };
 const CATEGORIES = Object.keys(PRESETS);
 const CARDIO_UNITS = { Running: 'km/h', Bike: 'Level' };
 function resolveCardioUnit(name, category, dbUnit) {
   return category === 'Cardio' ? (CARDIO_UNITS[name] || dbUnit || 'Value') : undefined;
+}
+
+// Strength categories can hold either weighted or bodyweight exercises; Core and Cardio keep their own inputs.
+// Presets are decided here; custom exercises carry the choice in exercises.load_type.
+const LOAD_TYPE_CATEGORIES = ['Chest', 'Back', 'Legs', 'Shoulders', 'Arms'];
+const BODYWEIGHT_PRESETS = new Set([
+  'Push-up', 'Dips', 'Pull-up', 'Inverted Row', 'Back Extension',
+  'Bodyweight Squat', 'Lunge', 'Hip Lift', 'Bodyweight Calf Raise', 'Pike Push-up', 'Reverse Push-up',
+]);
+
+function resolveLoadType(name, category, dbLoadType) {
+  if (!LOAD_TYPE_CATEGORIES.includes(category)) return 'weight';
+  if (BODYWEIGHT_PRESETS.has(name)) return 'bodyweight';
+  return dbLoadType === 'bodyweight' ? 'bodyweight' : 'weight';
 }
 
 // Stored data keeps the English keys; these only change what is shown.
@@ -298,6 +312,11 @@ const EXERCISE_LABELS = {
   'Leg Extension': 'レッグエクステンション', 'Calf Raise': 'カーフレイズ', 'Hip Adduction': 'ヒップアダクション',
   'Shoulder Press': 'ショルダープレス', 'Lateral Raise': 'サイドレイズ',
   'Barbell Curl': 'バーベルカール', 'Triceps Pressdown': 'トライセプスプレスダウン',
+  'Push-up': 'プッシュアップ', 'Dips': 'ディップス', 'Pull-up': 'プルアップ',
+  'Inverted Row': 'インバーテッドロウ', 'Back Extension': 'バックエクステンション',
+  'Bodyweight Squat': '自重スクワット', 'Lunge': 'ランジ', 'Hip Lift': 'ヒップリフト', 'Bodyweight Calf Raise': '自重カーフレイズ',
+  'Pike Push-up': 'パイクプッシュアップ', 'Reverse Push-up': 'リバースプッシュアップ',
+  'Reverse Crunch': 'リバースクランチ', 'Twist Crunch': 'ツイストクランチ',
   'Decline Sit-up': 'デクラインシットアップ', 'Crunch': 'クランチ', 'Hanging Leg Raise': 'ハンギングレッグレイズ',
   'Running': 'ランニング', 'Bike': 'バイク',
 };
@@ -329,6 +348,40 @@ const customInput     = document.getElementById('custom-exercise-input');
 const customUnitInput = document.getElementById('custom-exercise-unit-input');
 const customErrorEl   = document.getElementById('custom-exercise-error');
 const btnSaveCustom   = document.getElementById('btn-save-custom');
+const customLoadToggle = document.getElementById('custom-load-toggle');
+let customLoadType = 'weight';
+
+const customLoadHint = document.getElementById('custom-load-hint');
+
+function setCustomLoadType(type) {
+  customLoadType = type;
+  customLoadToggle.querySelectorAll('.load-btn').forEach(b => b.classList.toggle('active', b.dataset.load === type));
+}
+
+customLoadToggle.querySelectorAll('.load-btn').forEach(btn => {
+  btn.addEventListener('click', () => setCustomLoadType(btn.dataset.load));
+});
+
+// Fade the list edges and show "さらにN件" while there are exercises below the fold.
+const exerciseListWrap = document.getElementById('exercise-list-wrap');
+const exerciseListMore = document.getElementById('exercise-list-more');
+const exerciseListMoreCount = document.getElementById('exercise-list-more-count');
+
+function updateExerciseListHints() {
+  const list = exerciseListEl;
+  const canUp = list.scrollTop > 2;
+  const canDown = list.scrollTop + list.clientHeight < list.scrollHeight - 2;
+  exerciseListWrap.classList.toggle('more-up', canUp);
+  exerciseListWrap.classList.toggle('more-down', canDown);
+  const visibleBottom = list.scrollTop + list.clientHeight;
+  const hiddenCount = [...list.children].filter(li => li.offsetTop + li.offsetHeight / 2 > visibleBottom).length;
+  exerciseListMoreCount.textContent = hiddenCount;
+  exerciseListMore.hidden = !canDown || hiddenCount === 0;
+}
+
+exerciseListMore.addEventListener('click', () => {
+  exerciseListEl.scrollTo({ top: exerciseListEl.scrollHeight, behavior: 'smooth' });
+});
 
 function setCustomExerciseError(msg) {
   customErrorEl.textContent = msg;
@@ -344,7 +397,7 @@ const logDateInput        = document.getElementById('log-date');
 async function loadCustomExercises() {
   const { data, error } = await sb
     .from('exercises')
-    .select('id, name, category, cardio_unit')
+    .select('id, name, category, cardio_unit, load_type')
     .eq('is_preset', false)
     .order('name');
   if (!error && data) customExercises = data;
@@ -356,12 +409,14 @@ function openModal() {
   renderCategoryTabs();
   renderExerciseList();
   modalExercise.classList.remove('hidden');
+  updateExerciseListHints();
 }
 
 function closeModal() {
   modalExercise.classList.add('hidden');
   customInput.value = '';
   customUnitInput.value = '';
+  setCustomLoadType('weight');
   setCustomExerciseError('');
 }
 
@@ -384,12 +439,15 @@ function renderCategoryTabs() {
   });
 
   customUnitInput.classList.toggle('hidden', activeCategory !== 'Cardio');
+  customLoadToggle.classList.toggle('hidden', !LOAD_TYPE_CATEGORIES.includes(activeCategory));
+  // Keep the hint's space on every tab so switching tabs doesn't change the modal height.
+  customLoadHint.style.visibility = LOAD_TYPE_CATEGORIES.includes(activeCategory) ? 'visible' : 'hidden';
   setCustomExerciseError('');
 }
 
 // ── Exercise list ──
 function renderExerciseList() {
-  const presets = (PRESETS[activeCategory] || []).map(name => ({ name, category: activeCategory, id: null, cardio_unit: CARDIO_UNITS[name] || null }));
+  const presets = (PRESETS[activeCategory] || []).map(name => ({ name, category: activeCategory, id: null, cardio_unit: CARDIO_UNITS[name] || null, load_type: BODYWEIGHT_PRESETS.has(name) ? 'bodyweight' : 'weight' }));
   // A custom exercise that now matches a preset name would otherwise show up twice; records are matched by name, so history carries over.
   const presetNames = new Set(PRESETS[activeCategory] || []);
   const customs = customExercises.filter(e => e.category === activeCategory && !presetNames.has(e.name));
@@ -397,15 +455,15 @@ function renderExerciseList() {
 
   exerciseListEl.innerHTML = all.length
     ? all.map(ex => `
-        <li data-name="${escapeHtml(ex.name)}" data-cat="${escapeHtml(ex.category)}"${ex.id ? ` data-id="${escapeHtml(ex.id)}"` : ''}${ex.cardio_unit ? ` data-unit="${escapeHtml(ex.cardio_unit)}"` : ''}>
-          <span class="ex-name">${escapeHtml(exerciseLabel(ex.name))}</span>
+        <li data-name="${escapeHtml(ex.name)}" data-cat="${escapeHtml(ex.category)}"${ex.id ? ` data-id="${escapeHtml(ex.id)}"` : ''}${ex.cardio_unit ? ` data-unit="${escapeHtml(ex.cardio_unit)}"` : ''} data-load="${resolveLoadType(ex.name, ex.category, ex.load_type)}">
+          <span class="ex-name"><span class="ex-name-text">${escapeHtml(exerciseLabel(ex.name))}${resolveLoadType(ex.name, ex.category, ex.load_type) === 'bodyweight' ? '<span class="ex-load">自重</span>' : ''}</span></span>
           ${ex.id ? `<button class="btn-delete-custom" data-id="${escapeHtml(ex.id)}" data-name="${escapeHtml(ex.name)}">✕</button>` : ''}
         </li>`).join('')
     : '<li style="color:var(--text-sub);cursor:default">種目がありません</li>';
 
   exerciseListEl.querySelectorAll('li[data-name]').forEach(li => {
     li.addEventListener('click', () => {
-      addExercise(li.dataset.name, li.dataset.cat, li.dataset.id || null, li.dataset.unit || null);
+      addExercise(li.dataset.name, li.dataset.cat, li.dataset.id || null, li.dataset.unit || null, li.dataset.load || null);
       closeModal();
     });
   });
@@ -416,7 +474,12 @@ function renderExerciseList() {
       deleteCustomExercise(btn.dataset.id, btn.dataset.name);
     });
   });
+
+  exerciseListEl.scrollTop = 0;
+  updateExerciseListHints();
 }
+
+exerciseListEl.addEventListener('scroll', updateExerciseListHints);
 
 const TRASH_ICON = `<svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M10 11v6M14 11v6"/><path d="M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>`;
 
@@ -444,8 +507,8 @@ function escapeHtml(value) {
 }
 
 // ── Exercise blocks ──
-async function addExercise(name, category, id = null, cardioUnit = null) {
-  const entry = { name, category, id, cardioUnit, sets: [], isEditing: true, isExpanded: true, prevWeight: null, prevReps: null, prevDuration: null, prevValue2: null, prevBest: null };
+async function addExercise(name, category, id = null, cardioUnit = null, loadType = null) {
+  const entry = { name, category, id, cardioUnit, loadType: resolveLoadType(name, category, loadType), sets: [], isEditing: true, isExpanded: true, prevWeight: null, prevReps: null, prevDuration: null, prevValue2: null, prevBest: null };
   sessionExercises.unshift(entry);
   renderExerciseBlocks();
 
@@ -460,8 +523,8 @@ async function addExercise(name, category, id = null, cardioUnit = null) {
   if (!prevSessions?.length || !sessionExercises.includes(entry)) return;
   const prevSessionIds = prevSessions.map(s => s.id);
 
-  if (setInputType(category) === 'weight') {
-    const { data: bestSets } = await sb.from('sets').select('weight').eq('exercise_id', exRow.id).in('session_id', prevSessionIds).order('weight', { ascending: false }).limit(1);
+  if (inputTypeOf(entry) === 'weight') {
+    const { data: bestSets } = await sb.from('sets').select('weight').eq('exercise_id', exRow.id).in('session_id', prevSessionIds).order('weight', { ascending: false, nullsFirst: false }).limit(1);
     if (!sessionExercises.includes(entry)) return;
     if (bestSets?.length) entry.prevBest = bestSets[0].weight;
   }
@@ -489,6 +552,12 @@ function addSet(ei, weight, reps, duration = null, value2 = null) {
   renderExerciseBlocks();
 }
 
+// Bodyweight exercises log reps only, the same way as Core.
+function inputTypeOf(ex) {
+  const type = setInputType(ex.category);
+  return type === 'weight' && ex.loadType === 'bodyweight' ? 'core' : type;
+}
+
 function setInputType(category) {
   if (category === 'Cardio') return 'cardio';
   if (category === 'Core')   return 'core';
@@ -508,7 +577,7 @@ function renderExerciseBlocks() {
   }
 
   exerciseBlocksEl.innerHTML = sessionExercises.map((ex, i) => {
-    const itype    = setInputType(ex.category);
+    const itype    = inputTypeOf(ex);
     const editing  = ex.isEditing !== false;
     const expanded = editing || ex.isExpanded !== false;
     const setCount = ex.sets.length;
@@ -635,7 +704,7 @@ function renderExerciseBlocks() {
 
   // One path for the + button and Enter, so every new set goes through the same range checks.
   const tryAddSet = (ei) => {
-    const itype = setInputType(sessionExercises[ei].category);
+    const itype = inputTypeOf(sessionExercises[ei]);
     const field = (cls) => exerciseBlocksEl.querySelector(`.${cls}[data-ei="${ei}"]`);
     // Typed value (even 0, so it can be range-checked), else the previous set shown as the placeholder,
     // else null meaning nothing has been entered yet.
@@ -848,7 +917,7 @@ async function loadDateRecord(date) {
       .select('exercise_id, weight, reps, duration, value2, unit')
       .in('session_id', existingSessionIds)
       .order('id', { ascending: true }),
-    sb.from('exercises').select('id, name, category, cardio_unit').eq('user_id', user.id),
+    sb.from('exercises').select('id, name, category, cardio_unit, load_type').eq('user_id', user.id),
   ]);
 
   const exMap = Object.fromEntries((exercises || []).map(ex => [ex.id, ex]));
@@ -858,10 +927,10 @@ async function loadDateRecord(date) {
     const ex = exMap[set.exercise_id];
     if (!ex) return;
     if (!exerciseMap[ex.name]) {
-      exerciseMap[ex.name] = { name: ex.name, category: ex.category, id: ex.id, cardioUnit: resolveCardioUnit(ex.name, ex.category, ex.cardio_unit), sets: [], isEditing: false, isExpanded: false };
+      exerciseMap[ex.name] = { name: ex.name, category: ex.category, id: ex.id, cardioUnit: resolveCardioUnit(ex.name, ex.category, ex.cardio_unit), loadType: resolveLoadType(ex.name, ex.category, ex.load_type), sets: [], isEditing: false, isExpanded: false };
       exerciseOrder.push(ex.name);
     }
-    exerciseMap[ex.name].sets.push({ weight: set.weight, reps: set.reps, duration: set.duration, value2: set.value2 });
+    exerciseMap[ex.name].sets.push({ weight: set.weight, reps: set.reps, duration: set.duration, value2: set.value2, saved: true });
   });
 
   sessionExercises = exerciseOrder.map(n => exerciseMap[n]).sort((a, b) => {
@@ -876,7 +945,7 @@ async function loadDateRecord(date) {
 }
 
 async function loadPersonalBests(date, userId) {
-  const targets = sessionExercises.filter(ex => ex.id && setInputType(ex.category) === 'weight');
+  const targets = sessionExercises.filter(ex => ex.id && inputTypeOf(ex) === 'weight');
   if (!targets.length) return;
 
   const { data: prevSessions } = await sb.from('sessions').select('id').eq('user_id', userId).lt('date', date);
@@ -1001,7 +1070,7 @@ async function saveExercise() {
         } else {
           const { data: created, error: createError } = await sb
             .from('exercises')
-            .insert({ user_id: user.id, name: ex.name, category: ex.category, is_preset: true })
+            .insert({ user_id: user.id, name: ex.name, category: ex.category, is_preset: true, load_type: ex.loadType || 'weight' })
             .select()
             .single();
           if (createError) throw createError;
@@ -1037,11 +1106,15 @@ async function saveExercise() {
     return fail(err);
   }
 
+  // Celebrate only sets added in this save: a best already reached by saved sets doesn't pop up again on later updates.
   const personalBests = exercises.flatMap(ex => {
-    if (setInputType(ex.category) !== 'weight' || ex.prevBest == null) return [];
-    const top = ex.sets.reduce((a, b) => (b.weight || 0) > (a.weight || 0) ? b : a, ex.sets[0]);
-    if (!(top.weight > ex.prevBest)) return [];
-    return [{ name: ex.name, weight: top.weight, reps: top.reps, prev: ex.prevBest }];
+    if (inputTypeOf(ex) !== 'weight' || ex.prevBest == null) return [];
+    const newSets = ex.sets.filter(set => !set.saved);
+    if (!newSets.length) return [];
+    const top = newSets.reduce((a, b) => (b.weight || 0) > (a.weight || 0) ? b : a, newSets[0]);
+    const bestSoFar = Math.max(ex.prevBest, ...ex.sets.filter(set => set.saved).map(set => set.weight || 0));
+    if (!(top.weight > bestSoFar)) return [];
+    return [{ name: ex.name, weight: top.weight, reps: top.reps, prev: bestSoFar }];
   });
 
   sessionExercises = [];
@@ -1168,7 +1241,10 @@ btnSaveCustom.addEventListener('click', async () => {
 
   const { data, error } = await sb
     .from('exercises')
-    .insert({ user_id: user.id, name, category: activeCategory, is_preset: false, cardio_unit: cardioUnit })
+    .insert({
+      user_id: user.id, name, category: activeCategory, is_preset: false, cardio_unit: cardioUnit,
+      load_type: LOAD_TYPE_CATEGORIES.includes(activeCategory) ? customLoadType : 'weight',
+    })
     .select()
     .single();
 
@@ -1211,7 +1287,7 @@ async function loadExercisesFromDate(sourceDate) {
       .select('exercise_id, weight, reps, duration, value2, unit')
       .in('session_id', sessionIds)
       .order('id', { ascending: true }),
-    sb.from('exercises').select('id, name, category, cardio_unit').eq('user_id', user.id),
+    sb.from('exercises').select('id, name, category, cardio_unit, load_type').eq('user_id', user.id),
   ]);
 
   const exMap = Object.fromEntries((exercises || []).map(ex => [ex.id, ex]));
@@ -1223,6 +1299,7 @@ async function loadExercisesFromDate(sourceDate) {
     if (!exerciseMap[ex.name]) {
       exerciseMap[ex.name] = {
         name: ex.name, category: ex.category, id: ex.id, cardioUnit: resolveCardioUnit(ex.name, ex.category, ex.cardio_unit),
+        loadType: resolveLoadType(ex.name, ex.category, ex.load_type),
         sets: [], isEditing: true, isExpanded: true,
       };
       exerciseOrder.push(ex.name);
@@ -1849,7 +1926,7 @@ function getShareHighlight(ex) {
       : { left: `${set.duration}分`, sep: '', right: '' };
     return { name: exerciseLabel(ex.name), category: ex.category, ...parts, sub, pr: false };
   }
-  if (setInputType(ex.category) === 'core') {
+  if (inputTypeOf(ex) === 'core') {
     const set = ex.sets.reduce((a, b) => (b.reps || 0) > (a.reps || 0) ? b : a, ex.sets[0]);
     return { name: exerciseLabel(ex.name), category: ex.category, left: '', sep: '', right: `${set.reps}回`, sub, pr: false };
   }
@@ -1865,7 +1942,7 @@ function buildShareSummary(exercises) {
     .map(categoryLabel);
   const setCount = exercises.reduce((n, ex) => n + ex.sets.length, 0);
   const volume = Math.round(exercises
-    .filter(ex => setInputType(ex.category) === 'weight')
+    .filter(ex => inputTypeOf(ex) === 'weight')
     .reduce((sum, ex) => sum + ex.sets.reduce((t, set) => t + (set.weight || 0) * (set.reps || 0), 0), 0));
   return { exerciseCount: exercises.length, setCount, volume, categories };
 }

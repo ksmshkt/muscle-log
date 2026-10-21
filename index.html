@@ -336,16 +336,23 @@
           <button class="modal-close" id="modal-close">✕</button>
         </div>
         <div class="category-tabs" id="category-tabs"></div>
-        <ul class="exercise-list" id="exercise-list"></ul>
+        <div class="exercise-list-wrap" id="exercise-list-wrap">
+          <ul class="exercise-list" id="exercise-list"></ul>
+          <button type="button" class="exercise-list-more" id="exercise-list-more" hidden>↓ さらに<span id="exercise-list-more-count"></span>件</button>
+        </div>
         <div class="custom-exercise-section">
-          <div class="custom-exercise-form">
-            <div class="custom-exercise-inputs">
-              <input type="text" id="custom-exercise-input" placeholder="種目名を入力" maxlength="40" required />
-              <input type="text" id="custom-exercise-unit-input" class="hidden" placeholder="単位(km/hなど)" maxlength="12" required />
+          <div class="custom-exercise-label">自分で種目を追加</div>
+          <div class="custom-exercise-row">
+            <input type="text" id="custom-exercise-input" placeholder="種目名" maxlength="40" required />
+            <input type="text" id="custom-exercise-unit-input" class="hidden" placeholder="単位(km/hなど)" maxlength="12" required />
+            <div class="load-toggle" id="custom-load-toggle" role="group" aria-label="負荷の種類">
+              <button type="button" class="load-btn active" data-load="weight">ウェイト</button>
+              <button type="button" class="load-btn" data-load="bodyweight">自重</button>
             </div>
-            <p id="custom-exercise-error" class="auth-error hidden"></p>
-            <button class="btn btn-primary" id="btn-save-custom">追加</button>
+            <button type="button" class="btn-add-custom" id="btn-save-custom">追加</button>
           </div>
+          <p class="custom-exercise-hint" id="custom-load-hint">自重を選ぶと、回数だけで記録する種目になります(あとから変更はできません)</p>
+          <p id="custom-exercise-error" class="auth-error hidden"></p>
         </div>
       </div>
     </div>
