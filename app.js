@@ -414,6 +414,7 @@ function openModal() {
 
 function closeModal() {
   modalExercise.classList.add('hidden');
+  renamingExerciseId = null;
   customInput.value = '';
   customUnitInput.value = '';
   setCustomLoadType('weight');
@@ -433,6 +434,7 @@ function renderCategoryTabs() {
   categoryTabsEl.querySelectorAll('.category-tab').forEach(btn => {
     btn.addEventListener('click', () => {
       activeCategory = btn.dataset.cat;
+      renamingExerciseId = null;
       renderCategoryTabs();
       renderExerciseList();
     });
@@ -446,25 +448,56 @@ function renderCategoryTabs() {
 }
 
 // ── Exercise list ──
-function renderExerciseList() {
+const PENCIL_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>';
+const CHECK_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>';
+const CLOSE_ICON = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+
+let renamingExerciseId = null;
+
+function renderExerciseList(resetScroll = true) {
   const presets = (PRESETS[activeCategory] || []).map(name => ({ name, category: activeCategory, id: null, cardio_unit: CARDIO_UNITS[name] || null, load_type: BODYWEIGHT_PRESETS.has(name) ? 'bodyweight' : 'weight' }));
   // A custom exercise that now matches a preset name would otherwise show up twice; records are matched by name, so history carries over.
   const presetNames = new Set(PRESETS[activeCategory] || []);
   const customs = customExercises.filter(e => e.category === activeCategory && !presetNames.has(e.name));
   const all = [...presets, ...customs];
 
+  const rowHTML = (ex) => {
+    if (ex.id && String(ex.id) === String(renamingExerciseId)) {
+      return `
+        <li class="ex-renaming">
+          <input type="text" class="rename-input" value="${escapeHtml(ex.name)}" maxlength="${MAX_EXERCISE_NAME}" aria-label="新しい種目名" />
+          <button type="button" class="ex-icon-btn ex-icon-confirm btn-rename-save" aria-label="名前を保存">${CHECK_ICON}</button>
+          <button type="button" class="ex-icon-btn btn-rename-cancel" aria-label="キャンセル">${CLOSE_ICON}</button>
+        </li>`;
+    }
+    const loadType = resolveLoadType(ex.name, ex.category, ex.load_type);
+    const actions = ex.id ? `
+          <span class="ex-actions">
+            <button type="button" class="ex-icon-btn ex-icon-edit btn-rename-custom" data-id="${escapeHtml(ex.id)}" aria-label="名前を変更">${PENCIL_ICON}</button>
+            <button type="button" class="ex-icon-btn ex-icon-delete btn-delete-custom" data-id="${escapeHtml(ex.id)}" data-name="${escapeHtml(ex.name)}" aria-label="種目を削除">${TRASH_ICON}</button>
+          </span>` : '';
+    return `
+        <li class="${ex.id ? 'ex-custom' : ''}" data-name="${escapeHtml(ex.name)}" data-cat="${escapeHtml(ex.category)}"${ex.id ? ` data-id="${escapeHtml(ex.id)}"` : ''}${ex.cardio_unit ? ` data-unit="${escapeHtml(ex.cardio_unit)}"` : ''} data-load="${loadType}">
+          <span class="ex-name"><span class="ex-name-text">${escapeHtml(exerciseLabel(ex.name))}${loadType === 'bodyweight' ? '<span class="ex-load">自重</span>' : ''}</span></span>${actions}
+        </li>`;
+  };
+
   exerciseListEl.innerHTML = all.length
-    ? all.map(ex => `
-        <li data-name="${escapeHtml(ex.name)}" data-cat="${escapeHtml(ex.category)}"${ex.id ? ` data-id="${escapeHtml(ex.id)}"` : ''}${ex.cardio_unit ? ` data-unit="${escapeHtml(ex.cardio_unit)}"` : ''} data-load="${resolveLoadType(ex.name, ex.category, ex.load_type)}">
-          <span class="ex-name"><span class="ex-name-text">${escapeHtml(exerciseLabel(ex.name))}${resolveLoadType(ex.name, ex.category, ex.load_type) === 'bodyweight' ? '<span class="ex-load">自重</span>' : ''}</span></span>
-          ${ex.id ? `<button class="btn-delete-custom" data-id="${escapeHtml(ex.id)}" data-name="${escapeHtml(ex.name)}">✕</button>` : ''}
-        </li>`).join('')
+    ? all.map(rowHTML).join('')
     : '<li style="color:var(--text-sub);cursor:default">種目がありません</li>';
 
   exerciseListEl.querySelectorAll('li[data-name]').forEach(li => {
     li.addEventListener('click', () => {
       addExercise(li.dataset.name, li.dataset.cat, li.dataset.id || null, li.dataset.unit || null, li.dataset.load || null);
       closeModal();
+    });
+  });
+
+  exerciseListEl.querySelectorAll('.btn-rename-custom').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      renamingExerciseId = btn.dataset.id;
+      renderExerciseList(false);
     });
   });
 
@@ -475,8 +508,56 @@ function renderExerciseList() {
     });
   });
 
-  exerciseListEl.scrollTop = 0;
+  const renameInput = exerciseListEl.querySelector('.rename-input');
+  if (renameInput) {
+    renameInput.focus();
+    renameInput.select();
+    renameInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') saveExerciseRename(renameInput.value);
+      if (e.key === 'Escape') cancelExerciseRename();
+    });
+    exerciseListEl.querySelector('.btn-rename-save').addEventListener('click', () => saveExerciseRename(renameInput.value));
+    exerciseListEl.querySelector('.btn-rename-cancel').addEventListener('click', cancelExerciseRename);
+  }
+
+  if (resetScroll) exerciseListEl.scrollTop = 0;
   updateExerciseListHints();
+}
+
+function cancelExerciseRename() {
+  renamingExerciseId = null;
+  renderExerciseList(false);
+}
+
+// Exercises are looked up by name in a few places, so names must stay unique and distinct from presets.
+async function saveExerciseRename(rawName) {
+  const id = renamingExerciseId;
+  const target = customExercises.find(ex => String(ex.id) === String(id));
+  if (!target) return cancelExerciseRename();
+
+  const name = rawName.trim();
+  if (!name) { alert('種目名を入力してください。'); return; }
+  if (name.length > MAX_EXERCISE_NAME) { alert(`種目名は${MAX_EXERCISE_NAME}文字以内で入力してください。`); return; }
+  if (name === target.name) return cancelExerciseRename();
+
+  const lower = name.toLowerCase();
+  const presetTaken = Object.values(PRESETS).flat().some(p => p.toLowerCase() === lower || exerciseLabel(p).toLowerCase() === lower);
+  const customTaken = customExercises.some(ex => String(ex.id) !== String(id) && ex.name.toLowerCase() === lower);
+  if (presetTaken || customTaken) { alert('同じ名前の種目が既にあります。別の名前にしてください。'); return; }
+
+  // .single() turns "0 rows updated" (e.g. blocked by RLS) into an error instead of a silent no-op.
+  const { error } = await sb.from('exercises').update({ name }).eq('id', id).select('id').single();
+  if (error) {
+    console.error('saveExerciseRename:', error);
+    alert('名前を変更できませんでした。もう一度試してください。');
+    return;
+  }
+
+  target.name = name;
+  sessionExercises.forEach(ex => { if (String(ex.id) === String(id)) ex.name = name; });
+  renamingExerciseId = null;
+  renderExerciseList(false);
+  renderExerciseBlocks();
 }
 
 exerciseListEl.addEventListener('scroll', updateExerciseListHints);
@@ -1262,8 +1343,8 @@ async function deleteCustomExercise(id, name) {
   if (!confirm(`「${name}」を削除しますか?\nこの種目で記録したセットもすべて削除されます。`)) return;
   const { error } = await sb.from('exercises').delete().eq('id', id);
   if (error) return;
-  customExercises = customExercises.filter(ex => ex.id !== id);
-  renderExerciseList();
+  customExercises = customExercises.filter(ex => String(ex.id) !== String(id));
+  renderExerciseList(false);
 }
 
 // ════════════════════════════════════════

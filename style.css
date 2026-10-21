@@ -1753,15 +1753,61 @@ main {
   flex: 1;
 }
 
-.btn-delete-custom {
-  background: none;
+/* Custom rows: actions sit at the right edge without shifting the centered name;
+   the symmetric side padding keeps long names clear of them. */
+.exercise-list li { position: relative; }
+.exercise-list li.ex-custom { padding-left: 80px; padding-right: 80px; }
+
+.ex-actions {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  gap: 2px;
+}
+
+.ex-icon-btn {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   border: none;
-  color: var(--danger);
-  font-size: 13px;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-sub);
   cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
-  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+
+.ex-icon-edit { color: var(--primary-d); }
+.ex-icon-edit:hover { background: rgba(62, 168, 255, 0.12); }
+.ex-icon-delete:hover { color: var(--danger); background: rgba(239, 68, 68, 0.08); }
+.ex-icon-confirm { color: #fff; background: var(--primary-d); }
+.ex-icon-confirm:hover { background: var(--primary-dd); }
+
+/* Inline rename row */
+.exercise-list li.ex-renaming {
+  gap: 6px;
+  padding: 8px 4px;
+  cursor: default;
+  background: var(--surface);
+}
+
+.rename-input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--text);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(62, 168, 255, 0.15);
 }
 
 
