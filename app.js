@@ -59,8 +59,9 @@ function showAuth() {
   logDateInput.value = '';
 }
 
+// Local calendar date: toISOString() would give the UTC date, which is still "yesterday" before 9:00 in Japan.
 function today() {
-  return new Date().toISOString().split('T')[0];
+  return localDateStr(new Date());
 }
 
 function formatDateLabel(dateStr) {
@@ -1532,7 +1533,7 @@ function filterByPeriod(data, key) {
   const days = currentPeriod === 'month' ? 30 : 365;
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
-  const cutoffStr = cutoff.toISOString().split('T')[0];
+  const cutoffStr = localDateStr(cutoff);
   return data.filter(d => d[key] >= cutoffStr);
 }
 
