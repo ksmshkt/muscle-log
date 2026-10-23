@@ -2255,3 +2255,22 @@ body.scroll-locked {
   right: 0;
   overflow: hidden;
 }
+
+/* ── Demo login on the auth screen ── */
+.auth-demo-btn {
+  display: block;
+  width: 80%;
+  margin: 12px auto 0;
+  padding: 9px;
+  border: 1.5px solid var(--primary);
+  border-radius: 24px;
+  background: none;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--primary-d);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.auth-demo-btn:hover { background: rgba(62, 168, 255, 0.08); }

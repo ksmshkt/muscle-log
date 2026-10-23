@@ -272,6 +272,31 @@ resetPasswordForm.addEventListener('submit', async e => {
   showApp();
 });
 
+// ── Demo account ──
+// Shared, publicly listed demo login. The LP's "デモで試す" opens the app with ?demo=1.
+const DEMO_EMAIL = 'demo@muscle-log.app';
+const DEMO_PASSWORD = 'Demo1234!';
+
+function isDemoUser(user) {
+  return user?.email === DEMO_EMAIL;
+}
+
+async function signInAsDemo() {
+  setError('');
+  const { error } = await sb.auth.signInWithPassword({ email: DEMO_EMAIL, password: DEMO_PASSWORD });
+  if (error) setError('デモにログインできませんでした。時間をおいて、もう一度試してください。');
+}
+
+document.getElementById('btn-demo-login').addEventListener('click', signInAsDemo);
+
+// Only signs in when nobody is signed in, so an existing user following the link keeps their own account.
+(async () => {
+  if (!new URLSearchParams(location.search).has('demo')) return;
+  history.replaceState(null, '', location.pathname);
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) await signInAsDemo();
+})();
+
 // ── Email auth ──
 authForm.addEventListener('submit', async e => {
   e.preventDefault();
@@ -989,6 +1014,11 @@ document.getElementById('btn-delete-account').addEventListener('click', deleteAc
 async function deleteAccount() {
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return;
+  // The demo account is shared by everyone trying the app, so it can't be deleted from the menu.
+  if (isDemoUser(user)) {
+    alert('デモアカウントは削除できません。自分の記録をつけるときは、無料で登録してください。');
+    return;
+  }
 
   const confirmed = confirm(
     'アカウントと、トレーニング・体重の記録をすべて削除します。元に戻すことはできません。\n\n' +
