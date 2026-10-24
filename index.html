@@ -58,7 +58,7 @@
           <p id="auth-error" class="auth-error hidden"></p>
           <button type="submit" class="btn btn-primary" id="auth-submit">ログイン</button>
           <p class="auth-consent hidden" id="auth-consent">登録すると、<a href="terms/" target="_blank" rel="noopener">利用規約</a>と<a href="privacy/" target="_blank" rel="noopener">プライバシーポリシー</a>に同意したものとみなします。</p>
-          <button type="button" class="auth-demo-btn" id="btn-demo-login">登録せずにデモで試す</button>
+          <button type="button" class="auth-demo-btn" id="btn-guest-start">登録せずに始める</button>
         </form>
       </div>
 
@@ -142,6 +142,11 @@
             <svg class="account-menu-ext" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7"/><path d="M8 7h9v9"/></svg>
           </a>
 
+          <button class="account-menu-item hidden" id="btn-guest-register">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+            メールアドレスを登録
+          </button>
+
           <button class="account-menu-item" id="btn-signout">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
             ログアウト
@@ -161,6 +166,11 @@
         </div>
       </div>
     </header>
+
+    <div class="guest-banner hidden" id="guest-banner">
+      <p>登録していないため、ブラウザのデータを消すと記録に戻れなくなります。</p>
+      <button type="button" id="btn-guest-banner-register">登録する</button>
+    </div>
 
     <main>
       <div id="page-log" class="page active">
@@ -325,6 +335,29 @@
         <div class="pr-title">自己ベスト更新!</div>
         <ul class="pr-list" id="pr-list"></ul>
         <button class="btn btn-primary" id="btn-pr-close">閉じる</button>
+      </div>
+    </div>
+
+    <!-- ── Register (anonymous → email account) ── -->
+    <div id="modal-register" class="modal register-modal hidden">
+      <div class="modal-overlay" id="modal-register-overlay"></div>
+      <div class="register-card">
+        <div class="register-title">メールアドレスを登録</div>
+        <p class="register-desc">今までの記録はそのまま引き継がれます。登録すると、ほかの端末やブラウザからもログインできます。</p>
+        <form id="register-form" novalidate>
+          <div class="form-group">
+            <label for="register-email">メールアドレス</label>
+            <input type="email" id="register-email" placeholder="you@example.com" autocomplete="email" />
+          </div>
+          <div class="form-group">
+            <label for="register-password">パスワード(6文字以上)</label>
+            <input type="password" id="register-password" placeholder="••••••••" autocomplete="new-password" />
+          </div>
+          <p id="register-error" class="auth-error hidden"></p>
+          <button type="submit" class="btn btn-primary" id="register-submit">登録する</button>
+          <button type="button" class="auth-text-btn" id="register-cancel">キャンセル</button>
+          <p class="auth-consent">登録すると、<a href="terms/" target="_blank" rel="noopener">利用規約</a>と<a href="privacy/" target="_blank" rel="noopener">プライバシーポリシー</a>に同意したものとみなします。</p>
+        </form>
       </div>
     </div>
 

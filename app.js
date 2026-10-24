@@ -140,7 +140,8 @@ function authErrorMessage(error) {
   const msg = error?.message || '';
   if (/invalid login credentials/i.test(msg)) return 'メールアドレスかパスワードが正しくありません。';
   if (/email not confirmed/i.test(msg)) return 'メールアドレスの確認が済んでいません。届いたメールのリンクを開いてください。';
-  if (/already registered/i.test(msg)) return 'このメールアドレスはすでに登録されています。';
+  if (/already (been )?registered/i.test(msg) || error?.code === 'email_exists') return 'このメールアドレスはすでに登録されています。';
+  if (/anonymous sign-ins are disabled/i.test(msg)) return '今は登録なしで始められません。メールアドレスで登録してください。';
   if (/password should be at least/i.test(msg)) return 'パスワードは6文字以上にしてください。';
   if (/invalid format|valid email/i.test(msg)) return 'メールアドレスの形式が正しくありません。';
   if (/rate limit|too many/i.test(msg)) return '試行回数が多すぎます。しばらく時間をおいてから試してください。';
@@ -231,6 +232,7 @@ sb.auth.onAuthStateChange((_event, session) => {
     return;
   }
   if (session) {
+    updateGuestUI(session.user);
     // Supabase re-announces the session (SIGNED_IN / TOKEN_REFRESHED) when the app returns from the
     // background; re-running showApp() then would wipe the in-progress log while its modal stays open.
     if (!app.classList.contains('hidden')) return;
@@ -287,8 +289,6 @@ async function signInAsDemo() {
   if (error) setError('デモにログインできませんでした。時間をおいて、もう一度試してください。');
 }
 
-document.getElementById('btn-demo-login').addEventListener('click', signInAsDemo);
-
 // Only signs in when nobody is signed in, so an existing user following the link keeps their own account.
 (async () => {
   if (!new URLSearchParams(location.search).has('demo')) return;
@@ -296,6 +296,99 @@ document.getElementById('btn-demo-login').addEventListener('click', signInAsDemo
   const { data: { session } } = await sb.auth.getSession();
   if (!session) await signInAsDemo();
 })();
+
+// ── Guest (anonymous) start ──
+// Supabase anonymous sign-in: records are saved to the server like any account, but the only way back
+// into them is the session stored in this browser, until an email address is registered.
+async function signInAsGuest() {
+  setError('');
+  const { error } = await sb.auth.signInAnonymously({ options: { data: { unit: 'kg' } } });
+  if (error) setError(authErrorMessage(error));
+}
+
+document.getElementById('btn-guest-start').addEventListener('click', signInAsGuest);
+
+// The LP's "無料で始める" opens the app with ?start=1. Same rule as ?demo=1: never replace a signed-in account.
+(async () => {
+  if (!new URLSearchParams(location.search).has('start')) return;
+  history.replaceState(null, '', location.pathname);
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) await signInAsGuest();
+})();
+
+function isGuestUser(user) {
+  return !!user?.is_anonymous;
+}
+
+function updateGuestUI(user) {
+  const guest = isGuestUser(user);
+  document.getElementById('guest-banner').classList.toggle('hidden', !guest);
+  document.getElementById('btn-guest-register').classList.toggle('hidden', !guest);
+}
+
+// ── Register (guest → email account) ──
+const registerModal    = document.getElementById('modal-register');
+const registerForm     = document.getElementById('register-form');
+const registerEmail    = document.getElementById('register-email');
+const registerPassword = document.getElementById('register-password');
+const registerError    = document.getElementById('register-error');
+const registerSubmit   = document.getElementById('register-submit');
+
+function setRegisterError(msg) {
+  registerError.textContent = msg;
+  registerError.classList.toggle('hidden', !msg);
+}
+
+function openRegisterModal() {
+  document.getElementById('account-menu').classList.add('hidden');
+  setRegisterError('');
+  registerModal.classList.remove('hidden');
+}
+
+function closeRegisterModal() {
+  registerModal.classList.add('hidden');
+  registerPassword.value = '';
+}
+
+document.getElementById('btn-guest-register').addEventListener('click', openRegisterModal);
+document.getElementById('btn-guest-banner-register').addEventListener('click', openRegisterModal);
+document.getElementById('register-cancel').addEventListener('click', closeRegisterModal);
+document.getElementById('modal-register-overlay').addEventListener('click', closeRegisterModal);
+
+// Linking keeps the same user id, so every record carries over. Supabase sets the email first and
+// only accepts a password once the email is on the account.
+registerForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  setRegisterError('');
+
+  const email    = registerEmail.value.trim();
+  const password = registerPassword.value;
+  if (!email) { setRegisterError('メールアドレスを入力してください。'); return; }
+  if (password.length < 6) { setRegisterError('パスワードは6文字以上にしてください。'); return; }
+
+  registerSubmit.disabled = true;
+  try {
+    const { data, error } = await sb.auth.updateUser({ email });
+    if (error) { setRegisterError(authErrorMessage(error)); return; }
+
+    if (data.user?.email !== email) {
+      // The project requires confirming the address; the password can be set after the link is opened.
+      setRegisterError('確認メールを送りました。メール内のリンクを開いてから、もう一度「登録する」を押してください。');
+      return;
+    }
+
+    const { error: pwError } = await sb.auth.updateUser({ password });
+    if (pwError) { setRegisterError(authErrorMessage(pwError)); return; }
+
+    const { data: { user } } = await sb.auth.getUser();
+    updateGuestUI(user);
+    closeRegisterModal();
+    registerEmail.value = '';
+    alert('登録しました。次からはこのメールアドレスとパスワードでログインできます。');
+  } finally {
+    registerSubmit.disabled = false;
+  }
+});
 
 // ── Email auth ──
 authForm.addEventListener('submit', async e => {
@@ -322,6 +415,12 @@ authForm.addEventListener('submit', async e => {
 
 // ── Sign out ──
 btnSignout.addEventListener('click', async () => {
+  const { data: { user } } = await sb.auth.getUser();
+  if (isGuestUser(user) && !confirm(
+    '登録していないため、ログアウトすると今までの記録には戻れなくなります。\n\n' +
+    '記録を残すときは、先にアカウントメニューの「メールアドレスを登録」から登録してください。\n\n' +
+    'ログアウトしますか?'
+  )) return;
   await sb.auth.signOut();
 });
 
@@ -1016,7 +1115,7 @@ async function deleteAccount() {
   if (!user) return;
   // The demo account is shared by everyone trying the app, so it can't be deleted from the menu.
   if (isDemoUser(user)) {
-    alert('デモアカウントは削除できません。自分の記録をつけるときは、無料で登録してください。');
+    alert('デモアカウントは削除できません。自分の記録をつけるときは、ログアウトして「登録せずに始める」か、無料で登録してください。');
     return;
   }
 
