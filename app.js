@@ -1344,6 +1344,7 @@ async function saveExercise() {
         }
       }
 
+      ex.savedExerciseId = exerciseId;
       const { error: setsError } = await sb.from('sets').insert(
         ex.sets.map(s => ({
           session_id: session.id,
@@ -1373,15 +1374,16 @@ async function saveExercise() {
   }
 
   // Celebrate only sets added in this save: a best already reached by saved sets doesn't pop up again on later updates.
-  const personalBests = exercises.flatMap(ex => {
+  const candidates = exercises.flatMap(ex => {
     if (inputTypeOf(ex) !== 'weight' || ex.prevBest == null) return [];
     const newSets = ex.sets.filter(set => !set.saved);
     if (!newSets.length) return [];
     const top = newSets.reduce((a, b) => (b.weight || 0) > (a.weight || 0) ? b : a, newSets[0]);
     const bestSoFar = Math.max(ex.prevBest, ...ex.sets.filter(set => set.saved).map(set => set.weight || 0));
     if (!(top.weight > bestSoFar)) return [];
-    return [{ name: ex.name, weight: top.weight, reps: top.reps, prev: bestSoFar }];
+    return [{ name: ex.name, exerciseId: ex.savedExerciseId, weight: top.weight, reps: top.reps, prev: bestSoFar }];
   });
+  const personalBests = await dropBeatenOnLaterDates(candidates, date, user.id);
 
   sessionExercises = [];
   existingSessionIds = [];
@@ -1395,15 +1397,34 @@ async function saveExercise() {
   if (personalBests.length) showPersonalBests(personalBests);
 }
 
+// prevBest only looks at earlier days, so a day filled in after the fact can beat those and still be
+// lighter than what was lifted later. Only celebrate a weight that tops every recorded day.
+async function dropBeatenOnLaterDates(bests, date, userId) {
+  if (!bests.length) return bests;
+  const { data: laterSessions, error } = await sb.from('sessions').select('id').eq('user_id', userId).gt('date', date);
+  if (error || !laterSessions?.length) return bests;
+  const { data: laterSets, error: setsError } = await sb.from('sets')
+    .select('exercise_id, weight')
+    .in('session_id', laterSessions.map(s => s.id))
+    .in('exercise_id', bests.map(b => b.exerciseId));
+  if (setsError) return bests;
+  return bests.filter(b => !laterSets.some(set => String(set.exercise_id) === String(b.exerciseId) && set.weight >= b.weight));
+}
+
 // ── Personal best celebration ──
 const modalPr = document.getElementById('modal-pr');
+
+let prCountFrame = 0;
+
+const prDetailText = (b, weight) => `${weight}${currentUnit} × ${b.reps}回`;
+const prDiffText = b => `+${Math.round((b.weight - b.prev) * 100) / 100}${currentUnit}`;
 
 function showPersonalBests(bests) {
   document.getElementById('pr-list').innerHTML = bests.map(b => `
     <li>
       <span class="pr-ex-name">${escapeHtml(exerciseLabel(b.name))}</span>
-      <span class="pr-ex-detail">${b.weight}${currentUnit} × ${b.reps}回</span>
-      <span class="pr-ex-prev">これまで ${b.prev}${currentUnit}</span>
+      <span class="pr-ex-detail">${prDetailText(b, b.prev)}</span>
+      <span class="pr-ex-diff">${prDiffText(b)}</span>
     </li>
   `).join('');
 
@@ -1416,9 +1437,39 @@ function showPersonalBests(bests) {
   }).join('');
 
   modalPr.classList.remove('hidden');
+  countUpPersonalBests(bests);
+}
+
+// Each weight counts up from the previous best to the new one, then the gain pops in.
+function countUpPersonalBests(bests) {
+  cancelAnimationFrame(prCountFrame);
+  const items = [...document.querySelectorAll('#pr-list li')];
+  const finish = () => items.forEach((li, i) => {
+    li.querySelector('.pr-ex-detail').textContent = prDetailText(bests[i], bests[i].weight);
+    li.querySelector('.pr-ex-diff').classList.add('show');
+  });
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return finish();
+
+  const DELAY = 250;
+  const DURATION = 900;
+  const start = performance.now() + DELAY;
+  const step = now => {
+    const t = Math.min(1, Math.max(0, (now - start) / DURATION));
+    const eased = 1 - Math.pow(1 - t, 3);
+    items.forEach((li, i) => {
+      const b = bests[i];
+      const decimals = Number.isInteger(b.prev) && Number.isInteger(b.weight) ? 0 : 1;
+      const value = (b.prev + (b.weight - b.prev) * eased).toFixed(decimals);
+      li.querySelector('.pr-ex-detail').textContent = prDetailText(b, value);
+    });
+    if (t < 1) prCountFrame = requestAnimationFrame(step);
+    else finish();
+  };
+  prCountFrame = requestAnimationFrame(step);
 }
 
 function closePersonalBests() {
+  cancelAnimationFrame(prCountFrame);
   modalPr.classList.add('hidden');
   document.getElementById('pr-confetti').innerHTML = '';
 }
@@ -2472,7 +2523,8 @@ async function buildShareCard(date, highlights, summary) {
   return canvas;
 }
 
-document.getElementById('btn-share-log').addEventListener('click', async () => {
+// The popup after a new personal best shares the same day card, which marks the bests with PR.
+async function shareDayLog() {
   const date = logDateInput.value || today();
   const exercises = sessionExercises.filter(ex => ex.sets.length > 0);
   const highlights = exercises.map(getShareHighlight);
@@ -2521,7 +2573,10 @@ document.getElementById('btn-share-log').addEventListener('click', async () => {
     const tweetText = encodeURIComponent(caption);
     window.open(`https://twitter.com/intent/tweet?text=${tweetText}`, '_blank');
   }, 'image/png');
-});
+}
+
+document.getElementById('btn-share-log').addEventListener('click', shareDayLog);
+document.getElementById('btn-pr-share').addEventListener('click', shareDayLog);
 
 // ── Delete log ──
 document.getElementById('btn-delete-log').addEventListener('click', async () => {
