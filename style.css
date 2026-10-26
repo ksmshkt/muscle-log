@@ -531,6 +531,11 @@ main {
   border-color: var(--primary);
 }
 
+.ex-select-trigger.has-cat {
+  border-left-width: 3px;
+  padding-left: 8px;
+}
+
 .ex-select-label {
   flex: 1;
   overflow: hidden;
@@ -612,7 +617,7 @@ main {
 .stat-chip-value {
   font-size: 15px;
   font-weight: 700;
-  color: var(--primary);
+  color: var(--text);
   line-height: 1.2;
 }
 
@@ -1356,11 +1361,42 @@ main {
   background: var(--primary);
 }
 
-.cal-mark-bw {
+/* Up to four dots fit on a line, so a day with every body part still stays within the cell height. */
+.cal-dots {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px;
+  max-width: 30px;
+  margin-top: 5px;
+}
+
+.cal-dots i {
   width: 6px;
   height: 6px;
-  background: transparent;
-  border: 1.5px solid var(--text-sub);
+  border-radius: 50%;
+}
+
+.cal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 12px;
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--text-sub);
+}
+
+.cal-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.cal-legend i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
 }
 
 /* ── History detail modal ── */

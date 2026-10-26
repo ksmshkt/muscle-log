@@ -490,6 +490,7 @@ let calendarYear    = new Date().getFullYear();
 let calendarMonth   = new Date().getMonth();
 let calSessionDates = new Set();
 let calAllDates     = new Set();
+let calDateCategories = new Map(); // date -> Set of body parts trained that day
 
 // ── DOM refs (exercise) ──
 const modalExercise   = document.getElementById('modal-exercise');
@@ -1278,6 +1279,7 @@ async function clearDayTraining() {
   }
 
   calSessionDates.delete(date);
+  calDateCategories.delete(date);
   if (!inputBodyWeight.value.trim() && !bwSavedValue) calAllDates.delete(date);
   renderCalendarGrid();
   sessionExercises = [];
@@ -1389,6 +1391,7 @@ async function saveExercise() {
   existingSessionIds = [];
   await loadDateRecord(date);
   calSessionDates.add(date);
+  calDateCategories.set(date, new Set(exercises.map(ex => ex.category)));
   calAllDates.add(date);
   renderCalendarGrid();
   btn.disabled = false;
@@ -1655,17 +1658,30 @@ async function loadHistory() {
   if (!user) return;
 
   const [{ data: sessions }, { data: bodyWeights }] = await Promise.all([
-    sb.from('sessions').select('date').eq('user_id', user.id),
+    sb.from('sessions').select('date, sets(exercises(category))').eq('user_id', user.id),
     sb.from('body_weights').select('date').eq('user_id', user.id),
   ]);
 
   calSessionDates = new Set((sessions || []).map(s => s.date));
+  calDateCategories = new Map();
+  (sessions || []).forEach(s => {
+    const cats = calDateCategories.get(s.date) || new Set();
+    (s.sets || []).forEach(set => { if (set.exercises?.category) cats.add(set.exercises.category); });
+    calDateCategories.set(s.date, cats);
+  });
   calAllDates = new Set([
     ...calSessionDates,
     ...(bodyWeights || []).map(b => b.date),
   ]);
 
   renderCalendarGrid();
+}
+
+// One dot per body part trained that day, in the picker's category order.
+function calendarMark(date) {
+  const cats = CATEGORIES.filter(cat => calDateCategories.get(date)?.has(cat));
+  if (!cats.length) return '<span class="cal-mark cal-mark-session"></span>';
+  return `<span class="cal-dots">${cats.map(cat => `<i style="background:var(--cat-${cat.toLowerCase()})"></i>`).join('')}</span>`;
 }
 
 function renderCalendarGrid() {
@@ -1692,8 +1708,7 @@ function renderCalendarGrid() {
     const isSelected = ds === selectedDate;
     html += `<div class="cal-day${hasSession ? ' cal-has-session' : hasBwOnly ? ' cal-has-bw' : ''}${isToday ? ' cal-today' : ''}${isSelected ? ' cal-selected' : ''}" data-date="${ds}">
       <span class="cal-day-num">${d}</span>
-      ${hasSession ? '<span class="cal-mark cal-mark-session"></span>' : ''}
-      ${hasBwOnly  ? '<span class="cal-mark cal-mark-bw"></span>'      : ''}
+      ${hasSession ? calendarMark(ds) : ''}
     </div>`;
   }
 
@@ -1771,7 +1786,7 @@ async function loadCharts() {
       return `<li class="ex-select-item" data-id="${escapeHtml(ex.id)}" data-cat="${escapeHtml(ex.category)}" data-name="${escapeHtml(ex.name)}" style="border-left-color:${color}">${escapeHtml(exerciseLabel(ex.name))}<span class="ex-select-cat">${ex.category ? escapeHtml(categoryLabel(ex.category)) : ''}</span></li>`;
     }).join('');
   const found = currentExerciseId && recordedExercises.find(ex => String(ex.id) === String(currentExerciseId));
-  if (found) { setExSelectLabel(exerciseLabel(found.name), CAT_COLORS[found.category] || ''); currentExerciseCategory = found.category || null; }
+  if (found) { setExSelectLabel(exerciseLabel(found.name), CAT_COLORS[found.category] || '', found.category); currentExerciseCategory = found.category || null; }
   else { setExSelectLabel('種目を選択', ''); currentExerciseId = null; currentExerciseCategory = null; }
 
   renderBodyWeightChart();
@@ -2016,10 +2031,15 @@ document.querySelectorAll('.period-tab').forEach(btn => {
   });
 });
 
-function setExSelectLabel(name, color) {
+// The name stays in the text color; the body part shows as a colored left edge plus its name in grey,
+// the same way the list rows mark it.
+function setExSelectLabel(name, color = '', category = '') {
   const label = document.getElementById('exercise-select-label');
   label.textContent = name;
-  label.style.color = color || '';
+  if (category) label.insertAdjacentHTML('beforeend', `<span class="ex-select-cat">${escapeHtml(categoryLabel(category))}</span>`);
+  const trigger = document.getElementById('exercise-select-trigger');
+  trigger.classList.toggle('has-cat', !!color);
+  trigger.style.borderLeftColor = color;
 }
 
 document.getElementById('exercise-select-trigger').addEventListener('click', () => {
@@ -2040,7 +2060,7 @@ document.getElementById('exercise-select-list').addEventListener('click', e => {
   const color = item.style.borderLeftColor;
   currentExerciseId       = id || null;
   currentExerciseCategory = id ? (item.dataset.cat || null) : null;
-  setExSelectLabel(id ? exerciseLabel(item.dataset.name) : item.textContent, id ? color : '');
+  setExSelectLabel(id ? exerciseLabel(item.dataset.name) : item.textContent, id ? color : '', id ? item.dataset.cat : '');
   if (id) {
     loadExerciseChart(id);
   } else {
