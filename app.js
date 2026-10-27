@@ -1735,7 +1735,6 @@ async function deleteHistoryByDate(date, sessionIds) {
 let currentPeriod = 'month';
 let bwChartInstance   = null;
 let exChartInstance   = null;
-let freqChartInstance = null;
 let allBodyWeights = [];
 let allSessions = [];
 let currentExerciseSets      = [];
@@ -1789,8 +1788,11 @@ async function loadCharts() {
   if (found) { setExSelectLabel(exerciseLabel(found.name), CAT_COLORS[found.category] || '', found.category); currentExerciseCategory = found.category || null; }
   else { setExSelectLabel('種目を選択', ''); currentExerciseId = null; currentExerciseCategory = null; }
 
+  // The balance card reads the calendar's map; fill it first if the charts open before the calendar has loaded.
+  if (allSessions.length && !calDateCategories.size) await loadHistory();
+
   renderBodyWeightChart();
-  renderFrequencyChart();
+  renderPartBalance();
   renderStats();
 }
 
@@ -1837,85 +1839,45 @@ function localDateStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function getWeekStart(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00');
-  const dow = d.getDay();
-  d.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));
-  return localDateStr(d);
-}
+// How often each body part was trained in the period, counted in days so a single running set and
+// three sets of push-ups weigh the same. "前回" is the last day ever, so it also covers parts left
+// out of the period. Uses the same date -> body parts map as the log calendar's dots.
+function renderPartBalance() {
+  const list  = document.getElementById('part-balance');
+  const ph    = document.getElementById('part-balance-placeholder');
+  const total = document.getElementById('part-balance-total');
 
-function renderFrequencyChart() {
-  const wrap = document.getElementById('freq-chart-wrap');
-  const ph   = document.getElementById('freq-placeholder');
-
-  // Group ALL sessions by week start (no period filter on sessions)
-  const weekMap = {};
-  allSessions.forEach(s => {
-    const w = getWeekStart(s.date);
-    weekMap[w] = (weekMap[w] || 0) + 1;
-  });
-
-  // Filter by week start date being within the period
-  let cutoffStr = null;
-  if (currentPeriod !== 'all') {
-    const days = currentPeriod === 'month' ? 30 : 365;
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - days);
-    cutoffStr = localDateStr(cutoff);
-  }
-
-  const currentWeek = getWeekStart(localDateStr(new Date()));
-  const sortedWeeks = Object.keys(weekMap).sort();
-  const firstWeek   = cutoffStr
-    ? sortedWeeks.find(w => w >= cutoffStr)
-    : sortedWeeks[0];
-
-  if (!firstWeek) {
-    wrap.classList.add('hidden');
+  const dates = [...calDateCategories.keys()];
+  if (!dates.length) {
+    list.classList.add('hidden');
     ph.classList.remove('hidden');
-    if (freqChartInstance) { freqChartInstance.destroy(); freqChartInstance = null; }
+    total.textContent = '';
     return;
   }
-  wrap.classList.remove('hidden');
+  list.classList.remove('hidden');
   ph.classList.add('hidden');
 
-  const allWeeks = [];
-  const cur = new Date(firstWeek + 'T00:00:00');
-  const end = new Date(currentWeek + 'T00:00:00');
-  while (cur <= end) {
-    allWeeks.push(localDateStr(cur));
-    cur.setDate(cur.getDate() + 7);
-  }
+  const inPeriod = filterByPeriod(dates.map(date => ({ date })), 'date').map(d => d.date);
+  const periodName = { month: '30日', year: '1年', all: '全期間' }[currentPeriod];
+  total.textContent = `${periodName}で${inPeriod.length}日トレーニング`;
 
-  const labels = allWeeks.map(w => {
-    const d = new Date(w + 'T00:00:00');
-    return d.toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
+  const todayNum = Math.round(new Date(today() + 'T00:00:00') / 86400000);
+  const rows = CATEGORIES.map(cat => {
+    const count = inPeriod.filter(date => calDateCategories.get(date).has(cat)).length;
+    const last  = dates.filter(date => calDateCategories.get(date).has(cat)).sort().pop();
+    const ago   = last ? Math.max(0, todayNum - Math.round(new Date(last + 'T00:00:00') / 86400000)) : null;
+    return { cat, count, ago };
   });
-  const data = allWeeks.map(w => weekMap[w] || 0);
+  const max = Math.max(1, ...rows.map(r => r.count));
 
-  if (freqChartInstance) freqChartInstance.destroy();
-  freqChartInstance = new Chart(document.getElementById('freq-chart'), {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        data,
-        backgroundColor: 'rgba(62,168,255,0.65)',
-        borderColor: '#3ea8ff',
-        borderWidth: 1,
-        borderRadius: 4,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { display: false }, ticks: { maxTicksLimit: 8, font: { size: 11 } } },
-        y: { min: 0, ticks: { stepSize: 1, font: { size: 11 } } },
-      },
-    },
-  });
+  list.innerHTML = '<li class="part-balance-head" aria-hidden="true"><span></span><span></span><span>回数</span><span>前回</span></li>' +
+    rows.map(({ cat, count, ago }) => `
+      <li class="${count === 0 ? 'is-zero' : ''}${ago != null && ago >= 14 ? ' is-stale' : ''}">
+        <span class="part-name">${categoryLabel(cat)}</span>
+        <span class="part-track"><span style="width:${(count / max * 100).toFixed(1)}%;background:var(--cat-${cat.toLowerCase()})"></span></span>
+        <span class="part-count">${count}回</span>
+        <span class="part-last">${ago == null ? '—' : ago === 0 ? '今日' : `${ago}日前`}</span>
+      </li>`).join('');
 }
 
 async function loadExerciseChart(exerciseId) {
@@ -2025,7 +1987,7 @@ document.querySelectorAll('.period-tab').forEach(btn => {
     btn.classList.add('active');
     currentPeriod = btn.dataset.period;
     renderBodyWeightChart();
-    renderFrequencyChart();
+    renderPartBalance();
     renderStats();
     if (currentExerciseSets.length) renderExerciseChart();
   });
