@@ -2494,3 +2494,16 @@ body.scroll-locked {
   color: var(--text-sub);
   margin-bottom: 16px;
 }
+
+/* ── Home screen app on a phone ──
+   Without Safari's bottom bar the screen is about 96px taller. A taller tab bar and a larger gap
+   under the log modal take that up. Short phones have no room to spare. */
+@media (display-mode: standalone) and (max-width: 640px) and (min-height: 750px) {
+  :root {
+    --tab-h: 76px;
+  }
+
+  #modal-log .modal-content {
+    margin-bottom: calc(110px + env(safe-area-inset-bottom, 0px));
+  }
+}
