@@ -430,7 +430,7 @@ const PRESETS = {
   Legs:      ['Squat', 'Leg Press', 'Leg Curl', 'Leg Extension', 'Calf Raise', 'Hip Adduction', 'Bodyweight Squat', 'Lunge', 'Hip Lift', 'Bodyweight Calf Raise'],
   Shoulders: ['Shoulder Press', 'Lateral Raise', 'Pike Push-up'],
   Arms:      ['Barbell Curl', 'Triceps Pressdown', 'Reverse Push-up'],
-  Core:      ['Decline Sit-up', 'Crunch', 'Hanging Leg Raise', 'Reverse Crunch', 'Twist Crunch'],
+  Core:      ['Decline Sit-up', 'Crunch', 'Hanging Leg Raise', 'Reverse Crunch', 'Twist Crunch', 'Bicycle Crunch'],
   Cardio:    ['Running', 'Bike'],
 };
 const CATEGORIES = Object.keys(PRESETS);
@@ -468,7 +468,7 @@ const EXERCISE_LABELS = {
   'Inverted Row': 'インバーテッドロウ', 'Back Extension': 'バックエクステンション',
   'Bodyweight Squat': '自重スクワット', 'Lunge': 'ランジ', 'Hip Lift': 'ヒップリフト', 'Bodyweight Calf Raise': '自重カーフレイズ',
   'Pike Push-up': 'パイクプッシュアップ', 'Reverse Push-up': 'リバースプッシュアップ',
-  'Reverse Crunch': 'リバースクランチ', 'Twist Crunch': 'ツイストクランチ',
+  'Reverse Crunch': 'リバースクランチ', 'Twist Crunch': 'ツイストクランチ', 'Bicycle Crunch': 'バイシクルクランチ',
   'Decline Sit-up': 'デクラインシットアップ', 'Crunch': 'クランチ', 'Hanging Leg Raise': 'ハンギングレッグレイズ',
   'Running': 'ランニング', 'Bike': 'バイク',
 };
