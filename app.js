@@ -778,10 +778,11 @@ async function addExercise(name, category, id = null, cardioUnit = null, loadTyp
   if (!prevSessions?.length || !sessionExercises.includes(entry)) return;
   const prevSessionIds = prevSessions.map(s => s.id);
 
-  if (inputTypeOf(entry) === 'weight') {
-    const { data: bestSets } = await sb.from('sets').select('weight').eq('exercise_id', exRow.id).in('session_id', prevSessionIds).order('weight', { ascending: false, nullsFirst: false }).limit(1);
+  const bestField = bestFieldOf(entry);
+  if (bestField) {
+    const { data: bestSets } = await sb.from('sets').select(bestField).eq('exercise_id', exRow.id).in('session_id', prevSessionIds).order(bestField, { ascending: false, nullsFirst: false }).limit(1);
     if (!sessionExercises.includes(entry)) return;
-    if (bestSets?.length) entry.prevBest = bestSets[0].weight;
+    if (bestSets?.length && bestSets[0][bestField] != null) entry.prevBest = bestSets[0][bestField];
   }
 
   const { data: prevSets } = await sb.from('sets').select('weight, reps, duration, value2').eq('exercise_id', exRow.id).in('session_id', prevSessionIds.slice(0, 20)).order('id', { ascending: false }).limit(1);
@@ -817,6 +818,15 @@ function setInputType(category) {
   if (category === 'Cardio') return 'cardio';
   if (category === 'Core')   return 'core';
   return 'weight';
+}
+
+// What a personal best compares: the heaviest set for weighted exercises, the most reps in one set
+// for bodyweight and Core. Cardio has no personal best.
+function bestFieldOf(ex) {
+  const type = inputTypeOf(ex);
+  if (type === 'weight') return 'weight';
+  if (type === 'core')   return 'reps';
+  return null;
 }
 
 function removeSet(ei, si) {
@@ -1212,20 +1222,22 @@ async function loadDateRecord(date) {
 }
 
 async function loadPersonalBests(date, userId) {
-  const targets = sessionExercises.filter(ex => ex.id && inputTypeOf(ex) === 'weight');
+  const targets = sessionExercises.filter(ex => ex.id && bestFieldOf(ex));
   if (!targets.length) return;
 
   const { data: prevSessions } = await sb.from('sessions').select('id').eq('user_id', userId).lt('date', date);
   if (!prevSessions?.length) return;
 
   const { data: prevSets } = await sb.from('sets')
-    .select('exercise_id, weight')
+    .select('exercise_id, weight, reps')
     .in('session_id', prevSessions.map(s => s.id))
     .in('exercise_id', targets.map(ex => ex.id));
 
+  const fieldById = Object.fromEntries(targets.map(ex => [ex.id, bestFieldOf(ex)]));
   const best = {};
   (prevSets || []).forEach(s => {
-    if (s.weight != null && (best[s.exercise_id] == null || s.weight > best[s.exercise_id])) best[s.exercise_id] = s.weight;
+    const value = s[fieldById[s.exercise_id]];
+    if (value != null && (best[s.exercise_id] == null || value > best[s.exercise_id])) best[s.exercise_id] = value;
   });
 
   let changed = false;
@@ -1377,13 +1389,14 @@ async function saveExercise() {
 
   // Celebrate only sets added in this save: a best already reached by saved sets doesn't pop up again on later updates.
   const candidates = exercises.flatMap(ex => {
-    if (inputTypeOf(ex) !== 'weight' || ex.prevBest == null) return [];
+    const field = bestFieldOf(ex);
+    if (!field || ex.prevBest == null) return [];
     const newSets = ex.sets.filter(set => !set.saved);
     if (!newSets.length) return [];
-    const top = newSets.reduce((a, b) => (b.weight || 0) > (a.weight || 0) ? b : a, newSets[0]);
-    const bestSoFar = Math.max(ex.prevBest, ...ex.sets.filter(set => set.saved).map(set => set.weight || 0));
-    if (!(top.weight > bestSoFar)) return [];
-    return [{ name: ex.name, exerciseId: ex.savedExerciseId, weight: top.weight, reps: top.reps, prev: bestSoFar }];
+    const top = newSets.reduce((a, b) => (b[field] || 0) > (a[field] || 0) ? b : a, newSets[0]);
+    const bestSoFar = Math.max(ex.prevBest, ...ex.sets.filter(set => set.saved).map(set => set[field] || 0));
+    if (!(top[field] > bestSoFar)) return [];
+    return [{ name: ex.name, exerciseId: ex.savedExerciseId, field, value: top[field], reps: top.reps, prev: bestSoFar }];
   });
   const personalBests = await dropBeatenOnLaterDates(candidates, date, user.id);
 
@@ -1401,17 +1414,17 @@ async function saveExercise() {
 }
 
 // prevBest only looks at earlier days, so a day filled in after the fact can beat those and still be
-// lighter than what was lifted later. Only celebrate a weight that tops every recorded day.
+// lighter than what was lifted later. Only celebrate a best that tops every recorded day.
 async function dropBeatenOnLaterDates(bests, date, userId) {
   if (!bests.length) return bests;
   const { data: laterSessions, error } = await sb.from('sessions').select('id').eq('user_id', userId).gt('date', date);
   if (error || !laterSessions?.length) return bests;
   const { data: laterSets, error: setsError } = await sb.from('sets')
-    .select('exercise_id, weight')
+    .select('exercise_id, weight, reps')
     .in('session_id', laterSessions.map(s => s.id))
     .in('exercise_id', bests.map(b => b.exerciseId));
   if (setsError) return bests;
-  return bests.filter(b => !laterSets.some(set => String(set.exercise_id) === String(b.exerciseId) && set.weight >= b.weight));
+  return bests.filter(b => !laterSets.some(set => String(set.exercise_id) === String(b.exerciseId) && set[b.field] >= b.value));
 }
 
 // ── Personal best celebration ──
@@ -1419,8 +1432,8 @@ const modalPr = document.getElementById('modal-pr');
 
 let prCountFrame = 0;
 
-const prDetailText = (b, weight) => `${weight}${currentUnit} × ${b.reps}回`;
-const prDiffText = b => `+${Math.round((b.weight - b.prev) * 100) / 100}${currentUnit}`;
+const prDetailText = (b, value) => b.field === 'reps' ? `${value}回` : `${value}${currentUnit} × ${b.reps}回`;
+const prDiffText = b => `+${Math.round((b.value - b.prev) * 100) / 100}${b.field === 'reps' ? '回' : currentUnit}`;
 
 function showPersonalBests(bests) {
   document.getElementById('pr-list').innerHTML = bests.map(b => `
@@ -1443,12 +1456,12 @@ function showPersonalBests(bests) {
   countUpPersonalBests(bests);
 }
 
-// Each weight counts up from the previous best to the new one, then the gain pops in.
+// Each best counts up from the previous one to the new one, then the gain pops in.
 function countUpPersonalBests(bests) {
   cancelAnimationFrame(prCountFrame);
   const items = [...document.querySelectorAll('#pr-list li')];
   const finish = () => items.forEach((li, i) => {
-    li.querySelector('.pr-ex-detail').textContent = prDetailText(bests[i], bests[i].weight);
+    li.querySelector('.pr-ex-detail').textContent = prDetailText(bests[i], bests[i].value);
     li.querySelector('.pr-ex-diff').classList.add('show');
   });
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return finish();
@@ -1461,8 +1474,8 @@ function countUpPersonalBests(bests) {
     const eased = 1 - Math.pow(1 - t, 3);
     items.forEach((li, i) => {
       const b = bests[i];
-      const decimals = Number.isInteger(b.prev) && Number.isInteger(b.weight) ? 0 : 1;
-      const value = (b.prev + (b.weight - b.prev) * eased).toFixed(decimals);
+      const decimals = Number.isInteger(b.prev) && Number.isInteger(b.value) ? 0 : 1;
+      const value = (b.prev + (b.value - b.prev) * eased).toFixed(decimals);
       li.querySelector('.pr-ex-detail').textContent = prDetailText(b, value);
     });
     if (t < 1) prCountFrame = requestAnimationFrame(step);
@@ -2243,7 +2256,8 @@ function getShareHighlight(ex) {
   }
   if (inputTypeOf(ex) === 'core') {
     const set = ex.sets.reduce((a, b) => (b.reps || 0) > (a.reps || 0) ? b : a, ex.sets[0]);
-    return { name: exerciseLabel(ex.name), category: ex.category, left: '', sep: '', right: `${set.reps}回`, sub, pr: false };
+    const pr = ex.prevBest != null && set.reps > ex.prevBest;
+    return { name: exerciseLabel(ex.name), category: ex.category, left: '', sep: '', right: `${set.reps}回`, sub, pr };
   }
   const set = ex.sets.reduce((a, b) => (b.weight || 0) > (a.weight || 0) ? b : a, ex.sets[0]);
   const pr = ex.prevBest != null && set.weight > ex.prevBest;
